@@ -1,0 +1,14 @@
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.6
+  - blast
+  - primer3-py
+  - numpy
+  - biopython==1.73
+  - pandas
+  - matplotlib
+  - HTSeq
+  - mafft

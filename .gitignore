@@ -1,0 +1,13 @@
+*
+!scripts
+!scripts/*
+scripts/.snakemake*
+!Snakefile
+!config.yaml
+!envs
+!envs/*
+!LICENSE
+!README.md
+!.gitignore
+!.editorconfig
+!.gitattributes
