@@ -4,6 +4,7 @@
 scripts/.snakemake*
 !example_outdir
 !example_outdir/*
+!example_outdir/*/*
 !Snakefile
 !config.yaml
 !envs
