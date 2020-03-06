@@ -1,0 +1,8 @@
+#config5, try storing all of these in .csv files instead
+probeset_name: rpop_yeast1
+parameter_dir: design_params
+seqs_and_annotations: seqs_and_anns.csv
+targets: targets.csv
+params: params.csv
+offtarget_screening: True
+min_bitscore: 32
