@@ -77,6 +77,7 @@ def main(arglist):
             SeqIO.write(record_list, temp_fasta, "fasta")
 
         this_fasta = temp_fasta
+        os.remove(temp_fasta)
     else:
         this_fasta = fasta_list[0]
 

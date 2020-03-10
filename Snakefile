@@ -12,10 +12,6 @@ targets.sort()
 orgs.sort()
 param_df = pd.read_csv(os.path.join(config['parameter_dir'], config['params'])).set_index('target', drop = False)
 
-def get_ncrna_file(wildcards):
-    print('getting ncrnas')
-    return ann_df.loc[wildcards.org, 'ncrna']
-
 def get_targets(wildcards):
     '''
     Get the target IDs from the target.csv file. Change this to the Python script.

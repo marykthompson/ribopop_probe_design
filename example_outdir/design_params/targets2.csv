@@ -1,0 +1,5 @@
+﻿target,organism,ID,file
+small_ribo,Scer,,Scer_18S.fa
+small_ribo,Spom,,Spom_18S.fa
+large_ribo,Scer,,Scer_25S.fa
+large_ribo,Spom,,Spom_28S.fa

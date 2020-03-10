@@ -6,6 +6,7 @@ scripts/.snakemake*
 !example_outdir/*
 !example_outdir/*/*
 !Snakefile
+!check_probe_homology.smk
 !config.yaml
 !envs
 !envs/*
@@ -14,3 +15,5 @@ scripts/.snakemake*
 !.gitignore
 !.editorconfig
 !.gitattributes
+*/.DS_Store
+*/*/.DS_Store
