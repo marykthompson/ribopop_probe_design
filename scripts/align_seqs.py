@@ -78,8 +78,8 @@ def main(arglist):
         this_fasta = fasta_list[0]
 
     write_alignment(this_fasta, outfile)
-    if os.path.exists(temp_fasta):
-        os.remove(temp_fasta)
+    if os.path.exists('temp_multi.fa'):
+        os.remove('temp_multi.fa')
 
 if __name__ == '__main__':
     main(sys.argv[1:])
