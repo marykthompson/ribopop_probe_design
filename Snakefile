@@ -191,6 +191,7 @@ rule choose_probes:
         target_subregions = param_df.loc[targets, 'target_subregions'],
         excluded_regions = param_df.loc[targets, 'excluded_regions'],
         masked_nts = lambda wildcards, input: input.masked_nts if input.masked_nts != [] else None,
+        #quick_test = True,
         design_probes = True,
         outdir = 'probe_design/'
     output:

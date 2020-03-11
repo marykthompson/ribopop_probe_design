@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from Bio.SeqUtils import MeltingTemp as mt
 import itertools
 from collections import defaultdict
+from collections.abc import Iterable
 import logging
 
 class NotEnoughSpaceException(Exception):
@@ -25,6 +26,16 @@ class NotEnoughSpaceException(Exception):
     Consider designing fewer probes or relaxing your design constraints.
     '''
     pass
+
+def range_defined(ranges):
+    '''
+    Check whether ranges is defined. Let's us differentiate between nan/None and
+    a potential list of ranges.
+    '''
+    if isinstance(ranges, Iterable):
+        return(not pd.isnull(ranges).all())
+    else:
+        return(not pd.isnull(ranges))
 
 def calc_dimer(df):
     '''
@@ -270,7 +281,7 @@ class ProbeSet(object):
         #remove the nans and convert indices to integers
         mask_dict = {k: mask_series[k].dropna().astype(int).values for k in mask_series}
 
-        if not pd.isnull(excluded).all():
+        if range_defined(excluded):
             #subtract 1 from start to make python based coordinates
             excluded_regions = [(i[0] - 1, i[1]) for i in excluded]
             region_dict = defaultdict(set)
