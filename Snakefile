@@ -16,7 +16,6 @@ def get_targets(wildcards):
     '''
     Get the target IDs from the target.csv file. Change this to the Python script.
     '''
-    print('getting targets...')
     return target_df.loc[((target_df['target'] == wildcards.target) & (target_df['organism'] == wildcards.org)), 'ID'].values
 
 def get_masked_files(wildcards):
@@ -193,7 +192,6 @@ rule choose_probes:
         excluded_regions = param_df.loc[targets, 'excluded_regions'],
         masked_nts = lambda wildcards, input: input.masked_nts if input.masked_nts != [] else None,
         design_probes = True,
-        quick_test = True,
         outdir = 'probe_design/'
     output:
         expand('probe_design/{target}/selected_probes_{target}.csv', target = targets)
