@@ -82,7 +82,7 @@ def blast_kmers(kmer_file, fasta, outdir, outname, min_bitscore = 30, evalue = 1
     '''
     outfile = '{outprefix}.csv'.format(outprefix = os.path.join(outdir, outname))
     cmd = ' '.join(['blastn', '-task', 'blastn-short', '-dust', 'no', '-soft_masking',
-    'false', '-db', fasta, '-query', kmer_file, '-outfmt', '10', '-evalue', evalue, '-out', outfile])
+    'false', '-db', fasta, '-query', kmer_file, '-outfmt', '10', '-evalue', str(evalue), '-out', outfile])
     subprocess.check_call(cmd, shell = True)
     df = pd.read_csv(outfile, names = ['qseqid', 'sseqid', 'pident', 'length',
     'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore'])

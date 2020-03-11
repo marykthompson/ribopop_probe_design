@@ -270,7 +270,7 @@ class ProbeSet(object):
         #remove the nans and convert indices to integers
         mask_dict = {k: mask_series[k].dropna().astype(int).values for k in mask_series}
 
-        if not pd.isnull(excluded):
+        if not pd.isnull(excluded).all():
             #subtract 1 from start to make python based coordinates
             excluded_regions = [(i[0] - 1, i[1]) for i in excluded]
             region_dict = defaultdict(set)
@@ -425,10 +425,10 @@ class ProbeSet(object):
         self.probe_df.sort_values(by = 'midpt', ascending = True, inplace = True)
 
         bg = ax.scatter(self.probe_df['midpt'], self.probe_df['Tm'], s = 30,
-        alpha = 0.5, color = purple, edgecolors = 'none')
+        alpha = 0.3, color = purple, edgecolors = 'none')
 
         minidf = self.probe_df.loc[self.probe_df.index.isin(self.hitm_df.index)].copy()
-        pre = ax.scatter(minidf['midpt'], minidf['Tm'], s = 30, alpha = 0.5,
+        pre = ax.scatter(minidf['midpt'], minidf['Tm'], s = 30, alpha = 0.3,
         color = pink, edgecolors = 'none')
 
         for p in self.final_df.itertuples():
