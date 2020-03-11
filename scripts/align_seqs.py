@@ -19,7 +19,6 @@ def write_alignment(fasta, outname):
     '''
 
     name = snakemake.params['name']
-    #'%s-%s' % (snakemake.wildcards['org'], snakemake.wildcards['target'])
 
     #Check if only 1 sequence in the fasta file. If so, then just write this sequence
     with open(fasta, 'r') as f:
@@ -59,7 +58,6 @@ def write_alignment(fasta, outname):
 
 def main(arglist):
     #I think this is a more robust way to check if we are dealing with a single file or list because snakemake converts the type of things
-    #print('inputdir', dir(snakemake.input))
     outfile = snakemake.output['outfasta']
     fasta_list = snakemake.input['fastas']
     #if it's a list of files, the first item would always have more than 1 character
@@ -75,13 +73,13 @@ def main(arglist):
                     record_list.append(j)
 
             SeqIO.write(record_list, temp_fasta, "fasta")
-
         this_fasta = temp_fasta
-        os.remove(temp_fasta)
     else:
         this_fasta = fasta_list[0]
 
     write_alignment(this_fasta, outfile)
+    if os.path.exists(temp_fasta):
+        os.remove(temp_fasta)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
