@@ -1,6 +1,8 @@
 '''
 190430 MKT
 Design probes to bind a set of targets.
+v3: testing if can re-incorporate peak finding to output a df with peaks to use
+as input for Maria's minimization function
 '''
 import sys
 import numpy as np
@@ -19,6 +21,8 @@ import itertools
 from collections import defaultdict
 from collections.abc import Iterable
 import logging
+from scipy import signal
+import probe_site_selection
 
 class NotEnoughSpaceException(Exception):
     '''
@@ -318,100 +322,93 @@ class ProbeSet(object):
         their Tm used for calculating the quantiles.
         '''
         #Calculate rolling Tm quantile and find high Tm probes.
-        self.probe_df.sort_values('start', ascending = True, inplace = True)
-        failed_idx = self.probe_df.index.difference(self.passed_df.index)
+        quantile_df = self.probe_df.sort_values('start', ascending = True).copy()
+        failed_idx = quantile_df.index.difference(self.passed_df.index)
         #set the failed indices Tm to np.nan so won't be used for the rolling quantile
-        self.probe_df.loc[failed_idx, 'Tm'] = np.nan
+        quantile_df.loc[failed_idx, 'Tm'] = np.nan
         #window size is adjusted here to be scaled to the number of probes per position
         window_size = window_size * (self.max_probe_len - self.min_probe_len + 1)
         #Calculate the Tm of the provided quantile at each position
         #Only the probes that passed the filters are used for the Tm quantile calculations
-        self.probe_df['rolling_quantile_co'] = self.probe_df['Tm'].rolling(
+        quantile_df['rolling_quantile_co'] = quantile_df['Tm'].rolling(
         window_size, center = True, min_periods = 1).quantile(Tm_quantile)
-        self.probe_df['high_Tm'] = self.probe_df['Tm'] > self.probe_df['rolling_quantile_co']
 
-        hitm_df = self.probe_df[self.probe_df['high_Tm']].copy()
-        #remove duplicate target start probes (keep ones with highest Tm)
-        idx = hitm_df.groupby(['end'])['Tm'].transform(max) == hitm_df['Tm']
-        self.hitm_df = hitm_df[idx].copy()
+        quantile_df['passed_Tm_quantile'] = quantile_df['Tm'] > quantile_df['rolling_quantile_co']
+        self.passed_df['passed_Tm_quantile'] = quantile_df['passed_Tm_quantile']
+        self.passed_df = self.passed_df[self.passed_df['passed_Tm_quantile']].copy()
 
     def Tm_window_filter(self, min_tm, max_tm):
         '''
         Remove probes with Tm that fall outside the user-specified Tm window.
         '''
-        sorted_probes_df = self.hitm_df.sort_values('Tm')
+        sorted_probes_df = self.passed_df.sort_values('Tm')
         passed_indices = np.searchsorted(sorted_probes_df['Tm'].values, [min_tm, max_tm])
-        passed_probes_df = sorted_probes_df.iloc[passed_indices[0]: passed_indices[1]]
-        self.hitm_df = passed_probes_df.copy()
+        passed_probes_df = sorted_probes_df.iloc[passed_indices[0]: passed_indices[1]].copy()
+        passed_probes_df['passed_Tm_window'] = True
+        self.passed_df = passed_probes_df.copy()
 
-    def prune(self, desired_number_probes, subregions = None):
+    def prune(self, desired_number_probes, quantile_filter = True, subregions = None):
         '''
         Prune the probes into the desired number of probes per target.
+        - find Tm peaks
+        - get N evenly spaced probes
+        - if quantile_filter = True, require the peaks to also pass the Tm quantile threshold
         '''
+
         error_message = '''\
         Not enough space to design requested number of probes.
         Consider designing fewer probes or relaxing your design constraints.'''
 
+        #choose the highest Tm probe at each start site:
+        idx = self.passed_df.groupby(['start'])['Tm'].transform(max) == self.passed_df['Tm']
+        tm_df = self.passed_df[idx].copy()
+        #tm_df['passed_quantile'] = tm_df.index.isin(self.hitm_df[self.hitm_df['high_Tm']].index)
+        tm_df['unique_id'] = tm_df.index
+
         if pd.isnull(subregions):
             subregions = [(1, self.target_len)]
 
-        target_lens = [subregion[1] - subregion[0] + 1 for subregion in subregions]
-        #if not an integer, round up
+        #split the desired number of probes betwen the subregions
         this_probeset_size =  int(math.ceil(desired_number_probes/len(subregions)))
-        n_gaps = this_probeset_size - 1
-        #in the strange case that you only want to pick one probe:
-        if n_gaps == 0:
-            n_gaps = 1
-        min_covered_bp = self.min_probe_len * this_probeset_size
-        max_covered_bp = self.max_probe_len * this_probeset_size
-
         chosen_probes = []
 
         for i, subregion in enumerate(subregions):
-            max_gap_size = int(math.floor(target_lens[i] - min_covered_bp)/n_gaps)
 
             #get the mini df that contains the data in the subregion
-            sub_df = self.hitm_df[(subregion[0] <= self.hitm_df['target_start']) & (self.hitm_df['target_end'] <= subregion[1])]
-            attempted_gaps = [0, 0]
-            this_gap = max_gap_size
-            attempt = 0
-            while True:
-                suggested_probe_df = choose_nonoverlapping(sub_df, nt_spacing = this_gap)
-                if this_gap < 0:
-                    self.final_df = suggested_probe_df
-                    logging.info('''Could not reach the specified number of probes.\
-                    Only %s probes found.''' % len(self.final_df))
-                    logging.info('%s probes selected.' % len(probeset.final_df))
-                    probeset.summarize_results()
-                    raise NotEnoughSpaceException(error_message)
+            sub_df = tm_df[(subregion[0] <= tm_df['target_start']) & (tm_df['target_end'] <= subregion[1])]
 
-                elif len(suggested_probe_df) < this_probeset_size:
-                    this_gap -= 2
+            #Add the missing start positons back to but with Tm of 0
+            #This way, they will be included in the distance consideration for peak finding
+            #but can't be chosen as peaks themselves
+            this_distance = 50
 
-                elif len(suggested_probe_df) > this_probeset_size:
-                    this_gap += 2
-                    #It's possible to get stuck in a loop where one size gives too many and
-                    #another size gives too few.
-                    if this_gap == attempted_gaps[-2]:
-                        print('attempting to find mix of gap lengths')
-                        mixedgap_probe_df = trim_to_size(suggested_probe_df, this_probeset_size, attempted_gaps[-1], this_gap, len(suggested_probe_df))
-                        sub_df = mixedgap_probe_df
-                        if len(mixedgap_probe_df) != this_probeset_size:
-                            self.final_df = mixedgap_probe_df
-                            logging.info('''Could not find requested number of evenly spaced probes.''')
-                            logging.info('''Could not reach the specified number of probes.\
-                            Only %s probes found.''' % len(self.final_df))
-                            probeset.summarize_results()
-                            raise NotEnoughSpaceException(error_message)
-                        break
+            #start earlier because it cannot choose the endpts
+            start_range = range(sub_df['start'].min() - 1, sub_df['start'].max()+ 2)
+            range_df = pd.DataFrame(start_range, columns = ['start'])
+            new_df = pd.merge(range_df[['start']], sub_df[['unique_id', 'Tm', 'start']], 'outer', on = 'start')
 
-                else:
-                    #found the requested number of probes
-                    sub_df = suggested_probe_df
-                    break
+            ##new_df = pd.merge(range_df[['start']], sub_df[['unique_id', 'Tm', 'start', 'passed_quantile']], 'outer', on = 'start')
+            new_df['Tm'].fillna(0, inplace = True)
 
-                attempted_gaps.append(this_gap)
-                attempt += 1
+            #find Tm peaks
+            data = new_df['Tm'].values
+            maxes, properties = signal.find_peaks(data, distance = this_distance)
+            new_df['Tm_peak'] = new_df.index.isin(maxes)
+            new_df.to_csv('newdf.csv')
+            peak_locs = new_df.loc[new_df['Tm_peak'], 'start'].values
+
+            '''
+            #screen peaks for Tm quantile
+            if quantile_filter:
+                peak_locs = new_df.loc[(new_df['Tm_peak'] & new_df['passed_quantile']), 'start'].values
+            else:
+                peak_locs = new_df.loc[new_df['Tm_peak'], 'start'].values
+            '''
+            #get optimal spacing for desired number of probes
+            chosen_locs = probe_site_selection.choose_combination(peak_locs, this_probeset_size)
+            chosen_ids = new_df.loc[new_df['start'].isin(chosen_locs), 'unique_id'].astype('int')
+            sub_df = self.passed_df[self.passed_df.index.isin(chosen_ids)].copy()
+
             chosen_probes.append(sub_df)
 
         #combine probes from each subregion into the pruned_df
@@ -432,26 +429,34 @@ class ProbeSet(object):
         purple = '#4b4b8f'
         pink = '#CF1C90'
 
-        self.probe_df['midpt'] = self.probe_df['target_start'] + (self.probe_df['length'] - 1)/2
-        self.probe_df.sort_values(by = 'midpt', ascending = True, inplace = True)
+        pre_tm_cols = ['passed_masking', 'passed_sequence', 'passed_structure']
 
-        bg = ax.scatter(self.probe_df['midpt'], self.probe_df['Tm'], s = 30,
+        self.pre_tm_filter_df['midpt'] = self.pre_tm_filter_df['target_start'] + (self.pre_tm_filter_df['length'] - 1)/2
+        self.pre_tm_filter_df.sort_values(by = 'midpt', ascending = True, inplace = True)
+
+        bg = ax.scatter(self.pre_tm_filter_df['midpt'], self.pre_tm_filter_df['Tm'], s = 30,
         alpha = 0.3, color = purple, edgecolors = 'none')
 
-        minidf = self.probe_df.loc[self.probe_df.index.isin(self.hitm_df.index)].copy()
-        pre = ax.scatter(minidf['midpt'], minidf['Tm'], s = 30, alpha = 0.3,
-        color = pink, edgecolors = 'none')
+        mini_df = self.pre_tm_filter_df[self.pre_tm_filter_df.index.isin(self.final_df.index)].copy()
+        selected = ax.scatter(mini_df['midpt'], mini_df['Tm'], s = 30, alpha = 0.3, color = pink, edgecolors = 'none')
+
+        #minidf = self.probe_df.loc[self.probe_df.index.isin(self.hitm_df.index)].copy()
+
+        #minidf = self.probe_df.loc[self.probe_df.index.isin(self.hitm_df.index)].copy()
+        #pre = ax.scatter(minidf['midpt'], minidf['Tm'], s = 30, alpha = 0.3,
+        #color = pink, edgecolors = 'none')
 
         for p in self.final_df.itertuples():
             probe = ax.axvspan(p.target_start - 1, p.target_end, alpha=0.5, ymin = 0.0,
             ymax = 1, color = grey, linewidth = 0)
 
-        ax.set_xlim(self.probe_df['target_start'].min(), self.probe_df['target_end'].max())
+        ax.set_xlim(0, self.target_len)
+        #ax.set_xlim(self.probe_df['target_start'].min(), self.probe_df['target_end'].max())
 
         ax.set_ylabel('Tm')
         ax.set_xlabel('target position (nt)')
 
-        ax.legend([bg, pre, probe], ['before selection', 'post selection', 'probe site'],
+        ax.legend([bg, selected], ['before selection', 'selected'],
                mode = 'expand', fontsize = 8, ncol = 3, bbox_to_anchor=(0., 1.05, 1., .105), loc=3,
                borderaxespad=0., handletextpad=0.1)
 
@@ -510,7 +515,7 @@ def main(arglist):
     'unique_id', 'Tm', 'GC_content', 'A_content', 'C_content', 'dimer_dG',\
     'dimer_partner', 'GC_content_rule', 'A_composition_rule', 'C_composition_rule',\
     '4xA_stack_rule', '4xC_stack_rule', 'earlyCs_rule', 'any5_rule', 'passed_masking',\
-    'passed_sequence', 'passed_structure']
+    'passed_sequence', 'passed_structure', 'passed_Tm_window', 'passed_Tm_quantile']
 
     #A hack to get the argparse defaults overriden by snakemake args, if provided
     if 'snakemake' in globals():
@@ -603,15 +608,18 @@ def main(arglist):
             print('filtering by structure')
             probeset.structure_filter(args.min_hairpin_dG[i])
             logging.info("%s potential probes remaning after structure filter." % len(probeset.passed_df))
+            probeset.pre_tm_filter_df = probeset.passed_df.copy()
+            probeset.passed_df.to_csv(os.path.join(target_outdir, 'before_tm_filter_%s.csv' % target))
 
             print('getting probes in selected Tm quantile')
             probeset.quantile_filter(args.Tm_window_size[i], args.Tm_quantile[i])
-            probeset.probe_df.to_csv(os.path.join(target_outdir, 'before_filtering_%s.csv' % target))
+            logging.info("%s potential probes passed quantile threshold." % len(probeset.passed_df))
 
+            print('getting probes in selected Tm range')
             probeset.Tm_window_filter(args.min_Tm[i], args.max_Tm[i])
-            logging.info("%s potential probes passed quantile threshold and subjected to pruning." % len(probeset.hitm_df))
+            logging.info("%s potential probes in selected Tm range." % len(probeset.passed_df))
 
-            probeset.hitm_df.to_csv(os.path.join(target_outdir, 'before_pruning_%s.csv' % target))
+            probeset.passed_df.to_csv(os.path.join(target_outdir, 'before_pruning_%s.csv' % target))
 
             #Prune the remaining probes to the desired number of probes.
             removed_idx = [1]
@@ -625,7 +633,7 @@ def main(arglist):
                 #get indices of the pruned probes that don't survive heterodimer screening
                 removed_idx = probeset.pruned_df.index.difference(screened_df.index)
                 #drop bad heterodimer probes, will trigger rerun of prune with this probe removed.
-                probeset.hitm_df.drop(removed_idx, inplace = True)
+                probeset.passed_df.drop(removed_idx, inplace = True)
                 p += 1
 
             #Get the properties of the selected probes and write to output file
