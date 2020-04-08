@@ -1,6 +1,8 @@
 #Snakefile to design oligos for Ribopop
 import pandas as pd
 import os
+#import pdb; pdb.set_trace()
+
 snakedir = workflow.basedir
 configfile: 'config.yml'
 
@@ -14,7 +16,7 @@ param_df = pd.read_csv(os.path.join(config['parameter_dir'], config['params'])).
 
 def get_targets(wildcards):
     '''
-    Get the target IDs from the target.csv file. Change this to the Python script.
+    Get the target IDs from the target.csv file.
     '''
     return target_df.loc[((target_df['target'] == wildcards.target) & (target_df['organism'] == wildcards.org)), 'ID'].values
 
@@ -33,6 +35,8 @@ def get_masked_files(wildcards):
 
 rule all:
     input:
+        #"target_sequences/aln_by_org/Scer/18S.fa",
+        #"target_sequences/aln_by_org/Spom/18S.fa",
         expand('probe_design/{target}/selected_probes_{target}.csv', target = targets)
 
 rule download_ncrna:
@@ -51,34 +55,41 @@ rule extract_targets:
         target_file = os.path.join(config['parameter_dir'], config['targets']),
         ids = get_targets,
         snakedir = snakedir
+    conda:
+        'envs/probe_design.yaml'
     output:
         "target_sequences/original/{org}/{target}.fa"
     script:
         'scripts/extract_target_seqs.py'
 
+#first convert the excluded regions from specific target to the organism consensus
 rule make_alignment_by_organism:
     input:
-        fastas = ["target_sequences/original/{org}/{target}.fa"]
+        fasta = 'target_sequences/original/{org}/{target}.fa'
     params:
-        name = "{org}-{target}"
+        target_df = target_df,
+        name = '{org}-{target}'
     output:
-        outfasta = "target_sequences/aln_by_org/{org}/{target}.fa"
+        outfasta = 'target_sequences/aln_by_org/{org}/{target}.fa',
+        excluded1 = 'target_sequences/{org}-{target}.excluded1'
     conda:
         'envs/probe_design.yaml'
     script:
-        'scripts/align_seqs.py'
+        'scripts/align_by_organism.py'
 
 rule make_alignment_by_family:
     input:
-        fastas = expand("target_sequences/aln_by_org/{org}/{{target}}.fa", org = orgs)
+        fastas = expand("target_sequences/aln_by_org/{org}/{{target}}.fa", org = orgs),
+        excluded_regions_files = expand('target_sequences/{org}-{{target}}.excluded1', org = orgs)
     params:
         name = "{target}"
     output:
-        outfasta = "target_sequences/consensus/{target}.fa"
+        outfasta = "target_sequences/consensus/{target}.fa",
+        excluded2 = 'target_sequences/{target}.excluded2'
     conda:
         'envs/probe_design.yaml'
     script:
-        'scripts/align_seqs.py'
+        'scripts/align_by_target.py'
 
 rule download_seqs:
     output:
@@ -162,10 +173,11 @@ rule mask_nts:
         txt_homology_file = expand('offtarget_filtering/{org}/{{target}}-homology_txts_blast.csv', org = orgs),
         gtf = expand('offtarget_filtering/{org}/ann.gtf', org = orgs)
     params:
+        orgs = orgs,
         min_probe_length = lambda wildcards: param_df.loc[wildcards.target, 'min_probe_length'],
         max_probe_length = lambda wildcards: param_df.loc[wildcards.target, 'max_probe_length'],
         min_bitscore = config['min_bitscore'],
-        outdir = 'offtarget_filtering/masked/'
+        outdir = 'offtarget_filtering/masked/{target}'
     output:
         outfile = "offtarget_filtering/masked/{target}_masked.csv" #doesn't work only uses one target
     conda:
@@ -176,7 +188,8 @@ rule mask_nts:
 rule choose_probes:
     input:
         target_fastas = expand('target_sequences/consensus/{target}.fa', target = targets),
-        masked_nts = get_masked_files
+        masked_nts = get_masked_files,
+        excluded_regions = expand('target_sequences/{target}.excluded2', target = targets)
     params:
         target_names = targets,
         min_probe_length = param_df.loc[targets, 'min_probe_length'],
@@ -189,9 +202,10 @@ rule choose_probes:
         min_hairpin_dG = param_df.loc[targets, 'min_hairpin_dG'],
         min_dimer_dG = param_df.loc[targets, 'min_dimer_dG'],
         target_subregions = param_df.loc[targets, 'target_subregions'],
-        excluded_regions = param_df.loc[targets, 'excluded_regions'],
+        excluded_regions_consensus = param_df.loc[targets, 'excluded_regions_consensus'],
+        #excluded_regions = get_excluded_regions,
         masked_nts = lambda wildcards, input: input.masked_nts if input.masked_nts != [] else None,
-        #quick_test = True,
+        quick_test = True,
         design_probes = True,
         outdir = 'probe_design/'
     output:

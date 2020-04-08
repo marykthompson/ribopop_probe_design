@@ -5,7 +5,7 @@
 import pandas as pd
 import os
 snakedir = workflow.basedir
-configfile: 'config_probe_homology.yml'
+configfile: 'config_bifid_homology.yml'
 
 outdir = config['outname']
 

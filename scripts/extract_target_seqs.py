@@ -3,9 +3,6 @@
 from Bio import SeqIO
 import pandas as pd
 import os
-#import snakemake
-#snake_dir = snakemake.workflow.basedir
-#print('snakedir', snake_dir)
 
 def target_fasta_provided():
     '''Figure out if there is a target fasta provided already'''
@@ -32,16 +29,11 @@ def collect_seqs_by_id(infasta, ids, outfile):
                     continue
 
 def main(arglist):
-    #print(dir(snakemake))
     infasta = snakemake.input['fasta_file']
     ids = snakemake.params['ids']
     target_file = snakemake.params['target_file']
     snakedir = snakemake.params['snakedir']
     outfile = snakemake.output[0]
-
-    print('snakedir', snakedir)
-    print('cwd', os.getcwd())
-    print('outfile', outfile)
 
     target_fasta = target_fasta_provided()
     if target_fasta:
@@ -51,6 +43,3 @@ def main(arglist):
 
 if __name__ == '__main__':
     main(sys.argv[1:])
-'''
-FileNotFoundError: [Errno 2] No such file or directory: '/Users/maryk.thompson/Desktop/Davislab/OneDriveNexus365/2.25_rRNA_sub_2b/scripts/ribopop_pipeline/testyeast3/myfastas/Scer-18S.fa' -> '/Users/maryk.thompson/Desktop/Davislab/OneDriveNexus365/2.25_rRNA_sub_2b/scripts/ribopop_pipeline/target_sequences/Scer-18S.fa'
-'''

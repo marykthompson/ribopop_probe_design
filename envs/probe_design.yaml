@@ -13,3 +13,4 @@ dependencies:
   - HTSeq
   - mafft
   - scipy
+  - gffutils

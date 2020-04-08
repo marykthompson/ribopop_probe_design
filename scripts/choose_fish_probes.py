@@ -186,16 +186,24 @@ def melting_temp(seq, Na_conc = 300):
 
 def get_subregion_ranges(ranges_string):
     '''
-    Convert the provided ranges string into a list of integer lists,
-    e.g. "1-2000, 2300-3400" -> [(1, 2000), (2300, 3400)]
+    Convert the provided ranges string into an array, 0-based, half-open
+    e.g. "1-2000,2300-3400" -> [[0, 2000], [2299, 3400]]
     '''
+    #check if already converted
+    if type(ranges_string) == list:
+        return ranges_string
+
     subregion_ranges = []
-    subregion_list = [i for i in ranges_string.split(',')]
+    #subregion_list = [i for i in ranges_string.split(',')]
+    #If string is None, what will happen?
+    subregion_list = [i for i in ranges_string.replace(', ',',').split(',')]
     for i in subregion_list:
         start, end = [int(j.strip()) for j in i.split('-')]
-        subregion_ranges.append((start, end))
+        #convert to 0-based, half-open
+        start -= 1
+        subregion_ranges.append([start, end])
+    subregion_ranges = np.array(subregion_ranges)
     return subregion_ranges
-
 
 class ProbeSet(object):
     '''
@@ -273,46 +281,58 @@ class ProbeSet(object):
         if filter == True:
             self.passed_df = self.passed_df[self.passed_df['passed_structure']].copy()
 
-    def masking_filter(self, masking_file, excluded = None):
+    def masking_filter(self, masking_file):
         '''
         Take in file with masked starts by length and remove probes at those positions.
-        Also remove probes in user-provided excluded regions, for example regions of high
-        tertiary structure.
         '''
         mask_df = pd.read_csv(masking_file)
         mask_df.rename(columns = {i: int(i.split('_')[-1]) for i in mask_df.columns}, inplace = True)
         mask_series = mask_df.to_dict(orient = 'series')
         #remove the nans and convert indices to integers
         mask_dict = {k: mask_series[k].dropna().astype(int).values for k in mask_series}
+        #Check if potential probe start is masked:
+        self.passed_df['passed_masking'] = self.passed_df.apply(lambda x: (x['start'] not in mask_dict[x['length']] if x['length'] in mask_dict else True), axis = 1)
+        self.passed_df = self.passed_df[self.passed_df['passed_masking']].copy()
 
-        if range_defined(excluded):
-            #subtract 1 from start to make python based coordinates
-            excluded_regions = [(i[0] - 1, i[1]) for i in excluded]
-            region_dict = defaultdict(set)
-            for i in excluded_regions:
-                for j in range(self.min_probe_len, self.max_probe_len + 1):
-                    #+1 because we want reads that include that region
-                    #mask any of the start positions that would overlap the excluded region
-                    masked_start = i[0] - j + 1
-                    if masked_start < 0:
-                        masked_start = 0
-                    #end is excluded
-                    masked_end = i[1]
-                    new_range = set(range(masked_start, masked_end))
-                    region_dict[j].update(new_range)
+    def excluded_nt_filter(self, excluded = None, excluded_consensus = None):
+        '''
+        Remove probes in user-provided excluded regions, for example regions of high
+        tertiary structure. Can be from excluded (calculated in pipeline relative to
+        one transcript) or in excluded_conserved (relative to the pre-calculated
+        consensus sequence)
 
-        else:
-            region_dict = {}
+        '''
+        ll = []
+        for ranges in [excluded, excluded_consensus]:
+            if range_defined(ranges):
+                #range is already 0-based, but inclusive. End pt added as excluded nt
+                region_dict = defaultdict(set)
+                for i in ranges:
+                    logging.info('Excluded nts %s-%s in consensus sequence.' % (i[0]+1, i[1]))
+                    for j in range(self.min_probe_len, self.max_probe_len + 1):
+                        #+1 because we want reads that include that region
+                        #mask any of the start positions that would overlap the excluded region
+                        masked_start = i[0] - j + 1
+                        if masked_start < 0:
+                            masked_start = 0
+                        #end is excluded.
+                        masked_end = i[1]
+                        new_range = set(range(masked_start, masked_end))
+                        region_dict[j].update(new_range)
 
-        #combine the masked dict with the excluded nt dict
-        ll = [mask_dict, region_dict]
+            else:
+                region_dict = {}
+            ll.append(region_dict)
+
+        #combine the excluded dicts
         bad_start_dict = {k: set() for k in set().union(*ll)}
         for l in bad_start_dict:
             bad_start_dict[l] = set().union(*[i[l] for i in ll if l in i])
 
         #Check if potential probe start is masked:
-        self.passed_df['passed_masking'] = self.passed_df.apply(lambda x: (x['start']) not in bad_start_dict[x['length']], axis = 1)
-        self.passed_df = self.passed_df[self.passed_df['passed_masking']].copy()
+        ##self.passed_df['passed_excluded'] = self.passed_df.apply(lambda x: (x['start']) not in bad_start_dict[x['length']], axis = 1)
+        self.passed_df['passed_excluded'] = self.passed_df.apply(lambda x: (x['start'] not in bad_start_dict[x['length']] if x['length'] in bad_start_dict else True), axis = 1)
+        self.passed_df = self.passed_df[self.passed_df['passed_excluded']].copy()
 
     def quantile_filter(self, window_size, Tm_quantile):
         '''
@@ -396,7 +416,7 @@ class ProbeSet(object):
             new_df['Tm_peak'] = new_df.index.isin(maxes)
             new_df.to_csv('newdf.csv')
             peak_locs = new_df.loc[new_df['Tm_peak'], 'start'].values
-
+            logging.info('%s Tm peaks found.' % len(peak_locs))
             '''
             #screen peaks for Tm quantile
             if quantile_filter:
@@ -405,6 +425,11 @@ class ProbeSet(object):
                 peak_locs = new_df.loc[new_df['Tm_peak'], 'start'].values
             '''
             #get optimal spacing for desired number of probes
+            print('peak_locs', peak_locs)
+            print('probeset size', this_probeset_size)
+            if len(peak_locs) < this_probeset_size:
+                logging.info(error_message)
+                raise NotEnoughSpaceException(error_message)
             chosen_locs = probe_site_selection.choose_combination(peak_locs, this_probeset_size)
             chosen_ids = new_df.loc[new_df['start'].isin(chosen_locs), 'unique_id'].astype('int')
             sub_df = self.passed_df[self.passed_df.index.isin(chosen_ids)].copy()
@@ -492,7 +517,8 @@ def main(arglist):
     parser.add_argument('-Tm_quantile', nargs = '+', type = float, default = [0.9], help = 'Tm of probe must be above this quantile to be selected')
     parser.add_argument('-Tm_window_size', nargs = '+', type = int, default = [200], help ='# nt to include in calculating the Tm quantile')
     parser.add_argument('-masked_nts', nargs = '+', default = [None], help = 'csv file containing masked starting nts by length')
-    parser.add_argument('-excluded_regions', nargs = '+', default = [None], help = 'Regions to avoid placing probes in. Specify as a list of 1-based closed interval regions.')
+    parser.add_argument('-excluded_regions_consensus', nargs = '+', default = [None], help = 'Regions to avoid placing probes in. Specify as a list of 1-based closed interval regions.')
+    parser.add_argument('-excluded_regions', nargs = '+', default = [None], help = 'Regions to avoid placing probes in, calculated from one transcript in each target. Not provided directly.')
     parser.add_argument('-target_subregions', nargs = '+', default = [None], help = 'Regions to split the number of probes bewteen. Specify as a list of 1-based closed interval regions.')
     parser.add_argument('-min_hairpin_dG', nargs = '+', default = [-3], help = 'deltaG values for probes must be > than this value')
     parser.add_argument('-min_dimer_dG', nargs = '+', default = [-10], help = 'deltaG values for probes must be > than this value')
@@ -575,11 +601,11 @@ def main(arglist):
 
             logging.info('Target %s: ' % target)
 
-            #convert excluded and target ranges to list of integer tuples
+            #convert excluded and target ranges (ones as string from params.csv) to make_rRNA_homology_txts
             if not pd.isnull(args.target_subregions[i]):
                 args.target_subregions[i] = get_subregion_ranges(args.target_subregions[i])
-            if not pd.isnull(args.excluded_regions[i]):
-                args.excluded_regions[i] = get_subregion_ranges(args.excluded_regions[i])
+            if not pd.isnull(args.excluded_regions_consensus[i]):
+                args.excluded_regions_consensus[i] = get_subregion_ranges(args.excluded_regions_consensus[i])
 
             probeset = ProbeSet(args.Na_conc, target_outdir, target)
             probeset.scan_sequence(args.target_fastas[i], args.min_probe_length[i], args.max_probe_length[i])
@@ -598,8 +624,20 @@ def main(arglist):
             logging.info("Starting with %s potential probes." % len(probeset.passed_df))
             print('filtering out masked nts')
             if args.masked_nts:
-                probeset.masking_filter(args.masked_nts[i], excluded = args.excluded_regions[i])
+                probeset.masking_filter(args.masked_nts[i])
                 logging.info("%s potential probes remaning after masked nt filter." % len(probeset.passed_df))
+
+            print('filtering out excluded regions')
+            #add +1 to the end of the excluded regions to now adjust back to half-open interval
+            ##exregions = args.excluded_regions.loc[target].values
+            ##if len(exregions.shape) == 1:
+            ##    exregions = np.reshape(exregions, (1,2))
+            ##xregions[:, 1] += 1
+            #Also write the excluded regions to the log file here.
+            exdf = pd.read_csv(args.excluded_regions[i])
+            #probeset.excluded_nt_filter(excluded = exregions, excluded_consensus = args.excluded_regions_consensus[i])
+            probeset.excluded_nt_filter(excluded = exdf[['start', 'end']].values, excluded_consensus = args.excluded_regions_consensus[i])
+            logging.info("%s potential probes remaning after masked nt filter." % len(probeset.passed_df))
 
             print('filtering by sequence')
             probeset.sequence_composition_filter(args.sequence_filter_rules[i])

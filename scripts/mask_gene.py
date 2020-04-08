@@ -171,6 +171,7 @@ def main(arglist):
     parser.add_argument('-target_fasta', help = 'fasta file containing target sequence(s)')
     parser.add_argument('-min_probe_length', type = int, help = 'min probe length to use for mask generation')
     parser.add_argument('-max_probe_length', type = int, help = 'max probe length to use for mask generation')
+    parser.add_argument('-orgs', nargs = '+', help = 'list of organism names in same oreder as genome fastas')
     parser.add_argument('-outdir')
     parser.add_argument('-outfile', help = 'the name of the masked_nts file, i.e. 25S_masked.csv')
     parser.add_argument('-genome_fasta', nargs = '+', help = 'fasta files for the genome')
@@ -209,7 +210,7 @@ def main(arglist):
     #store a list of dictionaries with {length:{masked indices}}
     masked_start_l = []
     for i in range(0, len(args.genome_fasta)):
-        aln_check_dir = os.path.join(args.outdir, 'aln_files', 'set_%s' % i)
+        aln_check_dir = os.path.join(args.outdir, 'aln_files', args.orgs[i])
         os.makedirs(aln_check_dir, exist_ok = True)
         for probe_len in range(args.min_probe_length, args.max_probe_length + 1):
             #note that I'm requiring it to be on the same strand to be filtered out by alignment
