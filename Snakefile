@@ -36,6 +36,7 @@ def get_masked_files(wildcards):
 rule all:
     input:
         #"target_sequences/aln_by_org/Scer/18S.fa",
+        ##expand('target_sequences/consensus/{target}.fa', target = targets)
         #"target_sequences/aln_by_org/Spom/18S.fa",
         expand('probe_design/{target}/selected_probes_{target}.csv', target = targets)
 
@@ -201,7 +202,7 @@ rule choose_probes:
         Tm_window_size = param_df.loc[targets, 'Tm_window_size'],
         min_hairpin_dG = param_df.loc[targets, 'min_hairpin_dG'],
         min_dimer_dG = param_df.loc[targets, 'min_dimer_dG'],
-        target_subregions = param_df.loc[targets, 'target_subregions'],
+        target_subregions_consensus = param_df.loc[targets, 'target_subregions_consensus'],
         excluded_regions_consensus = param_df.loc[targets, 'excluded_regions_consensus'],
         #excluded_regions = get_excluded_regions,
         masked_nts = lambda wildcards, input: input.masked_nts if input.masked_nts != [] else None,

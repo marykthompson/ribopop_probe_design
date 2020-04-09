@@ -78,10 +78,3 @@ def write_alignment(fasta, name, outname):
         record = SeqRecord(whole_seq, id = name, description = '')
         SeqIO.write(record, outname, 'fasta')
         return alignment
-
-def convert_indices(x, alignment =  None, col = None):
-    '''
-    Call column_from_residue_number to add the new index to the df
-    '''
-    new_index = column_from_residue_number(alignment, x['ID'], x[col])
-    return new_index

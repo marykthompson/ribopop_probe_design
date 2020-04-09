@@ -186,21 +186,18 @@ def melting_temp(seq, Na_conc = 300):
 
 def get_subregion_ranges(ranges_string):
     '''
-    Convert the provided ranges string into an array, 0-based, half-open
-    e.g. "1-2000,2300-3400" -> [[0, 2000], [2299, 3400]]
+    Convert the provided ranges string into an array, 0-based, closed interval.
+    The reason for making it closed is to match the alignment-derived intervals.
+    e.g. "1-2000,2300-3400" -> [[0, 1999], [2299, 3399]]
     '''
-    #check if already converted
-    if type(ranges_string) == list:
-        return ranges_string
 
     subregion_ranges = []
-    #subregion_list = [i for i in ranges_string.split(',')]
-    #If string is None, what will happen?
     subregion_list = [i for i in ranges_string.replace(', ',',').split(',')]
     for i in subregion_list:
         start, end = [int(j.strip()) for j in i.split('-')]
         #convert to 0-based, half-open
         start -= 1
+        end -= 1
         subregion_ranges.append([start, end])
     subregion_ranges = np.array(subregion_ranges)
     return subregion_ranges
@@ -305,18 +302,18 @@ class ProbeSet(object):
         ll = []
         for ranges in [excluded, excluded_consensus]:
             if range_defined(ranges):
-                #range is already 0-based, but inclusive. End pt added as excluded nt
+                #range is already 0-based, but closed interval.
                 region_dict = defaultdict(set)
                 for i in ranges:
-                    logging.info('Excluded nts %s-%s in consensus sequence.' % (i[0]+1, i[1]))
+                    logging.info('Excluded nts %s-%s in consensus sequence.' % (i[0]+1, i[1]+1))
                     for j in range(self.min_probe_len, self.max_probe_len + 1):
                         #+1 because we want reads that include that region
                         #mask any of the start positions that would overlap the excluded region
                         masked_start = i[0] - j + 1
                         if masked_start < 0:
                             masked_start = 0
-                        #end is excluded.
-                        masked_end = i[1]
+                        #endpt is excluded. +1 to cover it.
+                        masked_end = i[1] + 1
                         new_range = set(range(masked_start, masked_end))
                         region_dict[j].update(new_range)
 
@@ -385,12 +382,19 @@ class ProbeSet(object):
         #tm_df['passed_quantile'] = tm_df.index.isin(self.hitm_df[self.hitm_df['high_Tm']].index)
         tm_df['unique_id'] = tm_df.index
 
-        if pd.isnull(subregions):
-            subregions = [(1, self.target_len)]
+        if not range_defined(subregions):
+            subregions = np.array([[1, self.target_len - 1]])
 
         #split the desired number of probes betwen the subregions
         this_probeset_size =  int(math.ceil(desired_number_probes/len(subregions)))
         chosen_probes = []
+        sorted_subregions = subregions[np.argsort(subregions[:, 0])]
+
+        #add 1 to the endpts to make half-open
+        sorted_subregions[:,1] += 1
+        print('sorted subregions', sorted_subregions)
+        substring = ', '.join(['%s-%s' % (i[0], i[1]) for i in sorted_subregions])
+        logging.info('Choosing probes in subregions %s' % substring)
 
         for i, subregion in enumerate(subregions):
 
@@ -417,20 +421,22 @@ class ProbeSet(object):
             new_df.to_csv('newdf.csv')
             peak_locs = new_df.loc[new_df['Tm_peak'], 'start'].values
             logging.info('%s Tm peaks found.' % len(peak_locs))
-            '''
-            #screen peaks for Tm quantile
-            if quantile_filter:
-                peak_locs = new_df.loc[(new_df['Tm_peak'] & new_df['passed_quantile']), 'start'].values
-            else:
-                peak_locs = new_df.loc[new_df['Tm_peak'], 'start'].values
-            '''
             #get optimal spacing for desired number of probes
             print('peak_locs', peak_locs)
             print('probeset size', this_probeset_size)
             if len(peak_locs) < this_probeset_size:
                 logging.info(error_message)
                 raise NotEnoughSpaceException(error_message)
-            chosen_locs = probe_site_selection.choose_combination(peak_locs, this_probeset_size)
+
+            #remove edgecases
+            #edge case where the number of peaks is two and the number of probes is 1, choose one closer to the middle
+            if len(peak_locs) == 1 and this_probeset_size == 1:
+                chosen_locs = peak_locs
+            elif len(peak_locs) == 2 and this_probeset_size == 1:
+                mid_dist = abs(peak_locs/(subregion[-1] - subregion[0] + 1) - 0.5)
+                chosen_locs = [peak_locs[np.argmin(mid_dist)]]
+            else:
+                chosen_locs = probe_site_selection.choose_combination(peak_locs, this_probeset_size)
             chosen_ids = new_df.loc[new_df['start'].isin(chosen_locs), 'unique_id'].astype('int')
             sub_df = self.passed_df[self.passed_df.index.isin(chosen_ids)].copy()
 
@@ -519,7 +525,7 @@ def main(arglist):
     parser.add_argument('-masked_nts', nargs = '+', default = [None], help = 'csv file containing masked starting nts by length')
     parser.add_argument('-excluded_regions_consensus', nargs = '+', default = [None], help = 'Regions to avoid placing probes in. Specify as a list of 1-based closed interval regions.')
     parser.add_argument('-excluded_regions', nargs = '+', default = [None], help = 'Regions to avoid placing probes in, calculated from one transcript in each target. Not provided directly.')
-    parser.add_argument('-target_subregions', nargs = '+', default = [None], help = 'Regions to split the number of probes bewteen. Specify as a list of 1-based closed interval regions.')
+    parser.add_argument('-target_subregions_consensus', nargs = '+', default = [None], help = 'Regions to split the number of probes bewteen. Specify as a list of 1-based closed interval regions.')
     parser.add_argument('-min_hairpin_dG', nargs = '+', default = [-3], help = 'deltaG values for probes must be > than this value')
     parser.add_argument('-min_dimer_dG', nargs = '+', default = [-10], help = 'deltaG values for probes must be > than this value')
 
@@ -561,7 +567,8 @@ def main(arglist):
 
     #Duplicate any default arguments to match the number of targets.
     target_param_l = ['min_probe_length', 'max_probe_length', 'min_Tm', 'max_Tm', 'desired_number_probes',
-    'Tm_quantile', 'Tm_window_size', 'masked_nts', 'excluded_regions', 'target_subregions', 'sequence_filter_rules',
+    'Tm_quantile', 'Tm_window_size', 'masked_nts', 'excluded_regions', 'excluded_regions_consensus',
+    'target_subregions_consensus', 'sequence_filter_rules',
     'min_hairpin_dG', 'min_dimer_dG']
 
     if args.analyze_oligos:
@@ -601,11 +608,14 @@ def main(arglist):
 
             logging.info('Target %s: ' % target)
 
-            #convert excluded and target ranges (ones as string from params.csv) to make_rRNA_homology_txts
-            if not pd.isnull(args.target_subregions[i]):
-                args.target_subregions[i] = get_subregion_ranges(args.target_subregions[i])
+            exdf = pd.read_csv(args.excluded_regions[i])
+            #choose the subregion ranges to be used. If there are ranges provided wrt consensus, replace the the calculated ones
+            target_subregions = exdf.loc[exdf['region_type'] == 'target_subregions', ['start', 'end']].values
+            if not pd.isnull(args.target_subregions_consensus[i]):
+                target_subregions = get_subregion_ranges(args.target_subregions_consensus[i])
             if not pd.isnull(args.excluded_regions_consensus[i]):
                 args.excluded_regions_consensus[i] = get_subregion_ranges(args.excluded_regions_consensus[i])
+
 
             probeset = ProbeSet(args.Na_conc, target_outdir, target)
             probeset.scan_sequence(args.target_fastas[i], args.min_probe_length[i], args.max_probe_length[i])
@@ -628,15 +638,8 @@ def main(arglist):
                 logging.info("%s potential probes remaning after masked nt filter." % len(probeset.passed_df))
 
             print('filtering out excluded regions')
-            #add +1 to the end of the excluded regions to now adjust back to half-open interval
-            ##exregions = args.excluded_regions.loc[target].values
-            ##if len(exregions.shape) == 1:
-            ##    exregions = np.reshape(exregions, (1,2))
-            ##xregions[:, 1] += 1
-            #Also write the excluded regions to the log file here.
-            exdf = pd.read_csv(args.excluded_regions[i])
-            #probeset.excluded_nt_filter(excluded = exregions, excluded_consensus = args.excluded_regions_consensus[i])
-            probeset.excluded_nt_filter(excluded = exdf[['start', 'end']].values, excluded_consensus = args.excluded_regions_consensus[i])
+            ex_calc = exdf.loc[exdf['region_type'] == 'excluded_regions', ['start', 'end']].values
+            probeset.excluded_nt_filter(excluded = ex_calc, excluded_consensus = args.excluded_regions_consensus[i])
             logging.info("%s potential probes remaning after masked nt filter." % len(probeset.passed_df))
 
             print('filtering by sequence')
@@ -664,7 +667,7 @@ def main(arglist):
             p = 0
             while len(removed_idx) > 0:
                 #get evenly spaced probes from the passed ones
-                probeset.prune(args.desired_number_probes[i], subregions = args.target_subregions[i])
+                probeset.prune(args.desired_number_probes[i], subregions = target_subregions)
                 #drop rows causing the low dimer dG scores
                 print('removing probes with dimer clashes')
                 screened_df = remove_bad_probes(probeset.pruned_df, args.min_dimer_dG[i], all_selected_probes)

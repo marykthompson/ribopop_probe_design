@@ -9,6 +9,13 @@ import os
 import alignment_funcs
 from Bio import SeqIO
 
+def convert_indices(x, alignment =  None, col = None):
+    '''
+    Call column_from_residue_number to add the new index to the df
+    '''
+    new_index = alignment_funcs.column_from_residue_number(alignment, x['ID'], x[col])
+    return new_index
+
 def main(arglist):
     fastas = snakemake.input['fastas']
     outfile = snakemake.output['outfasta']
@@ -30,18 +37,13 @@ def main(arglist):
     os.remove(temp_fasta)
 
     ex_df = pd.concat([pd.read_csv(i) for i in excluded1_files])
-    adj_regions = []
-    for rec in alignment:
-        if rec.id in ex_df['ID'].values:
-            excluded_regions = ex_df.loc[ex_df['ID'] == rec.id, ['start', 'end']].values
-            for i in excluded_regions:
-                new_start = alignment_funcs.column_from_residue_number(alignment, rec.id, i[0])
-                new_end = alignment_funcs.column_from_residue_number(alignment, rec.id, i[1])
-                adj_regions.append([new_start, new_end])
-
-    new_df = pd.DataFrame(adj_regions, columns = ['start', 'end'])
-    new_df['ID'] = name
-    new_df.to_csv(excluded2, index = False)
+    if not ex_df.empty:
+        ex_df['new_start'] = ex_df.apply(convert_indices, alignment = alignment, col = 'start', axis = 1)
+        ex_df['new_end'] = ex_df.apply(convert_indices, alignment = alignment, col = 'end', axis = 1)
+        ex_df.drop(['start', 'end'], axis = 1, inplace = True)
+        ex_df['ID'] = name
+        ex_df.rename(columns = {'new_start':'start', 'new_end':'end'}, inplace = True)
+    ex_df.to_csv(excluded2, index = False)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
