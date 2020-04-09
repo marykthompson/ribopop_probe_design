@@ -16,6 +16,18 @@ def gunzip(infile):
             shutil.copyfileobj(f_in, f_out)
     os.remove(infile)
 
+def retrieve_file(address, outfile):
+    '''
+    If url, download. If file, move it to the new location.
+    Note the path of a file should be the absolute path because
+    snakemake will likely be run in --directory mode.
+    '''
+    try:
+        local_path, headers = urlretrieve(address, outfile)
+    #not url
+    except ValueError:
+        shutil.copy(address, outfile)
+
 ann_df = pd.read_csv(os.path.join(snakemake.config['parameter_dir'],
 snakemake.config['seqs_and_annotations'])).set_index('organism', drop = False)
 
@@ -23,6 +35,9 @@ download_dict = snakemake.params['to_download']
 outdir = snakemake.params['outdir']
 for i in download_dict:
     address = ann_df.loc[snakemake.wildcards.org, i]
-    gzipped_file = os.path.join(outdir, download_dict[i]) + '.gz'
-    local_path, headers = urlretrieve(address, gzipped_file)
-    gunzip(gzipped_file)
+    if address.endswith('.gz'):
+        gzipped_file = os.path.join(outdir, download_dict[i]) + '.gz'
+        retrieve_file(address, gzipped_file)
+        gunzip(gzipped_file)
+    else:
+        retrieve_file(address, os.path.join(outdir, download_dict[i]))

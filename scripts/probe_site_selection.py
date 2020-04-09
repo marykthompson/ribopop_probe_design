@@ -43,19 +43,14 @@ def choose_combination(target_position, no_probe_sites):
     min_distance = np.min(my_func_dist(dist_between_probe_sites_array, ideal_length)) #Finding the distance that minimises criterion
     loc= np.where(my_func_dist(dist_between_probe_sites_array, ideal_length) == np.min(min_distance)) #Index of minimum
     return selected_combinations[loc[0][0]]
-    #print(selected_combinations[loc[0][0]])
 
 def test():
     '''
     test_targets = [
-    (3, 7, 9.5, 13, 19, 22, 23, 24, 25, 27, 30, 34),
-    (1, 8, 10, 13, 23, 25, 82, 92, 96, 97, 98)]
+    [3, 7, 9.5, 13, 19, 22, 23, 24, 25, 27, 30, 34],
+    [1, 8, 10, 13, 23, 25, 82, 92, 96, 97, 98]]
     '''
-    #test_targets = [(5, 300, 565)]
-    test_targets  = [[300]]
-    #target_position = (3, 7, 9.5, 13, 19, 22, 23, 24, 25, 27, 30, 34) #list for coordinates of target positions
-    #no_probe_sites = 5
-    no_probe_sites = 1
+    no_probe_sites = 5
 
     for t in test_targets:
         print('options', t)

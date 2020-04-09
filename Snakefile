@@ -38,24 +38,14 @@ rule all:
         #"target_sequences/aln_by_org/Scer/18S.fa",
         ##expand('target_sequences/consensus/{target}.fa', target = targets)
         #"target_sequences/aln_by_org/Spom/18S.fa",
-        expand('probe_design/{target}/selected_probes_{target}.csv', target = targets)
-
-rule download_ncrna:
-    params:
-        outdir = 'offtarget_filtering/{org}/',
-        to_download = {'ncrna':'temp_ncrna.fa'}
-    output:
-        ncrna_file = 'offtarget_filtering/{org}/temp_ncrna.fa'
-    script:
-        "scripts/download_seqs.py"
-
+        expand('offtarget_filtering/{org}/genome.fa', org = orgs),
+        expand('target_sequences/original/{org}/{target}.fa', target = targets, org = orgs)
+        #expand('probe_design/{target}/selected_probes_{target}.csv', target = targets)
 rule extract_targets:
     input:
-        fasta_file = 'offtarget_filtering/{org}/temp_ncrna.fa'
+        fasta_file = 'offtarget_filtering/{org}/ncrna.fa'
     params:
-        target_file = os.path.join(config['parameter_dir'], config['targets']),
-        ids = get_targets,
-        snakedir = snakedir
+        sub_target_df = lambda wildcards: target_df[(target_df['target'] == wildcards.target) & (target_df['organism'] == wildcards.org)]
     conda:
         'envs/probe_design.yaml'
     output:
@@ -101,6 +91,8 @@ rule download_seqs:
     params:
         outdir = 'offtarget_filtering/{org}/',
         to_download = {'genome':'genome.fa', 'cdna': 'cdna.fa', 'ncrna':'ncrna.fa', 'gtf': 'ann.gtf'}
+    conda:
+        'envs/probe_design.yaml'
     script:
         'scripts/download_seqs.py'
 
