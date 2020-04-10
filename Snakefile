@@ -1,7 +1,6 @@
 #Snakefile to design oligos for Ribopop
 import pandas as pd
 import os
-#import pdb; pdb.set_trace()
 
 snakedir = workflow.basedir
 configfile: 'config.yml'
@@ -35,12 +34,8 @@ def get_masked_files(wildcards):
 
 rule all:
     input:
-        #"target_sequences/aln_by_org/Scer/18S.fa",
-        ##expand('target_sequences/consensus/{target}.fa', target = targets)
-        #"target_sequences/aln_by_org/Spom/18S.fa",
-        expand('offtarget_filtering/{org}/genome.fa', org = orgs),
-        expand('target_sequences/original/{org}/{target}.fa', target = targets, org = orgs)
-        #expand('probe_design/{target}/selected_probes_{target}.csv', target = targets)
+        expand('probe_design/{target}/selected_probes_{target}.csv', target = targets)
+
 rule extract_targets:
     input:
         fasta_file = 'offtarget_filtering/{org}/ncrna.fa'
@@ -62,12 +57,13 @@ rule make_alignment_by_organism:
         name = '{org}-{target}'
     output:
         outfasta = 'target_sequences/aln_by_org/{org}/{target}.fa',
-        excluded1 = 'target_sequences/{org}-{target}.excluded1'
+        excluded1 = temp('target_sequences/{org}-{target}.excluded1')
     conda:
         'envs/probe_design.yaml'
     script:
         'scripts/align_by_organism.py'
 
+#next make an alignment by target
 rule make_alignment_by_family:
     input:
         fastas = expand("target_sequences/aln_by_org/{org}/{{target}}.fa", org = orgs),
@@ -76,7 +72,7 @@ rule make_alignment_by_family:
         name = "{target}"
     output:
         outfasta = "target_sequences/consensus/{target}.fa",
-        excluded2 = 'target_sequences/{target}.excluded2'
+        excluded2 = temp('target_sequences/{target}.excluded2')
     conda:
         'envs/probe_design.yaml'
     script:
@@ -154,7 +150,8 @@ rule make_rRNA_homology_txts:
         'envs/probe_design.yaml'
     script:
         'scripts/run_blastn.py'
-#an_index_file is a way to link the rules. Blast indexing does not rename the file
+
+#some_index_files is a way to link the rules. Blast indexing does not rename the file
 #you still just give it the fasta file and it looks for the related files in the same directory
 rule mask_nts:
     input:
@@ -190,15 +187,14 @@ rule choose_probes:
         min_Tm = param_df.loc[targets, 'min_Tm'],
         max_Tm = param_df.loc[targets, 'max_Tm'],
         Tm_quantile = param_df.loc[targets, 'Tm_quantile'],
-        desired_number_probes = param_df.loc[targets, 'max_number_probes'],
+        desired_number_probes = param_df.loc[targets, 'number_probes'],
         Tm_window_size = param_df.loc[targets, 'Tm_window_size'],
         min_hairpin_dG = param_df.loc[targets, 'min_hairpin_dG'],
         min_dimer_dG = param_df.loc[targets, 'min_dimer_dG'],
         target_subregions_consensus = param_df.loc[targets, 'target_subregions_consensus'],
         excluded_regions_consensus = param_df.loc[targets, 'excluded_regions_consensus'],
-        #excluded_regions = get_excluded_regions,
         masked_nts = lambda wildcards, input: input.masked_nts if input.masked_nts != [] else None,
-        quick_test = True,
+        #quick_test = True,
         design_probes = True,
         outdir = 'probe_design/'
     output:

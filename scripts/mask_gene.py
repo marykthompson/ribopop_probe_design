@@ -18,8 +18,6 @@ import subprocess
 import argparse
 import sys
 from Bio import SeqIO
-#from Bio.Seq import Seq
-#from Bio.SeqRecord import SeqRecord
 import HTSeq
 from collections import defaultdict
 import pandas as pd

@@ -1,5 +1,4 @@
-#config5, try storing all of these in .csv files instead
-probeset_name: rpop_yeast1
+#config file for probeset
 parameter_dir: design_params
 seqs_and_annotations: seqs_and_anns.csv
 targets: targets.csv

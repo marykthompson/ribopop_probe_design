@@ -1,8 +1,6 @@
 '''
 190430 MKT
 Design probes to bind a set of targets.
-v3: testing if can re-incorporate peak finding to output a df with peaks to use
-as input for Maria's minimization function
 '''
 import sys
 import numpy as np
@@ -392,7 +390,6 @@ class ProbeSet(object):
 
         #add 1 to the endpts to make half-open
         sorted_subregions[:,1] += 1
-        print('sorted subregions', sorted_subregions)
         substring = ', '.join(['%s-%s' % (i[0], i[1]) for i in sorted_subregions])
         logging.info('Choosing probes in subregions %s' % substring)
 
@@ -422,8 +419,6 @@ class ProbeSet(object):
             peak_locs = new_df.loc[new_df['Tm_peak'], 'start'].values
             logging.info('%s Tm peaks found.' % len(peak_locs))
             #get optimal spacing for desired number of probes
-            print('peak_locs', peak_locs)
-            print('probeset size', this_probeset_size)
             if len(peak_locs) < this_probeset_size:
                 logging.info(error_message)
                 raise NotEnoughSpaceException(error_message)
@@ -600,7 +595,6 @@ def main(arglist):
         #stop writing all the font warnings to the log file
         logging.getLogger('matplotlib.font_manager').disabled = True
         for i, target in enumerate(args.target_names):
-            print('target %s' % target)
             assert args.min_Tm[i] < args.max_Tm[i]
             assert args.min_probe_length[i] <= args.max_probe_length[i]
             target_outdir = os.path.join(args.outdir, target)

@@ -1,5 +1,0 @@
-#config probe homology
-outname: rpop_homology
-probe_file: probes_to_blast/dmel_probes.csv
-genome_fasta: offtarget_filtering/Scer/genome.fa
-txt_fasta: offtarget_filtering/Scer/txts.fa
