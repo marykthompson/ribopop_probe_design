@@ -131,7 +131,7 @@ rule make_rRNA_homology_genome:
     input:
         an_index_file = 'offtarget_filtering/{org}/genome.fa.nhr',
         subject_fasta = 'offtarget_filtering/{org}/genome.fa',
-        query_fasta = 'target_sequences/consensus/{target}.fa'
+        query_fasta = 'target_sequences/aln_by_org/{org}/{target}.fa'
     output:
         outname = 'offtarget_filtering/{org}/{target}-homology_genome_blast.csv'
     conda:
@@ -143,7 +143,7 @@ rule make_rRNA_homology_txts:
     input:
         an_index_file = 'offtarget_filtering/{org}/txts.fa.nhr',
         subject_fasta = 'offtarget_filtering/{org}/txts.fa',
-        query_fasta = 'target_sequences/consensus/{target}.fa'
+        query_fasta = 'target_sequences/aln_by_org/{org}/{target}.fa'
     output:
         outname = 'offtarget_filtering/{org}/{target}-homology_txts_blast.csv'
     conda:

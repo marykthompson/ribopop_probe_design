@@ -415,7 +415,6 @@ class ProbeSet(object):
             data = new_df['Tm'].values
             maxes, properties = signal.find_peaks(data, distance = this_distance)
             new_df['Tm_peak'] = new_df.index.isin(maxes)
-            new_df.to_csv('newdf.csv')
             peak_locs = new_df.loc[new_df['Tm_peak'], 'start'].values
             logging.info('%s Tm peaks found.' % len(peak_locs))
             #get optimal spacing for desired number of probes

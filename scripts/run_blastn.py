@@ -37,41 +37,27 @@ def main(arglist):
     #A hack to get the argparse defaults overriden by snakemake args, if provided
     #snakemake is a global variable
     if 'snakemake' in globals():
-        print('global snake!')
-    #If the script is called by snakemake, reassign args from input, output, and params, where specified
-    toset = defaultdict(list)
-    argdict = vars(args)
-    for arg in argdict:
-        if hasattr(snakemake.input, arg):
-            toset['input'].append(arg)
-        if hasattr(snakemake.params, arg):
-            toset['params'].append(arg)
-        if hasattr(snakemake.output, arg):
-            toset['output'].append(arg)
+        #If the script is called by snakemake, reassign args from input, output, and params, where specified
+        toset = defaultdict(list)
+        argdict = vars(args)
+        for arg in argdict:
+            if hasattr(snakemake.input, arg):
+                toset['input'].append(arg)
+            if hasattr(snakemake.params, arg):
+                toset['params'].append(arg)
+            if hasattr(snakemake.output, arg):
+                toset['output'].append(arg)
 
-    for block in toset:
-        for arg in toset[block]:
-            print('arg', arg)
-            #setattr(args, arg = getattr(getattr(snakemake, block), arg)
-            setattr(args, arg, getattr(getattr(snakemake, block), arg))
+        for block in toset:
+            for arg in toset[block]:
+                setattr(args, arg, getattr(getattr(snakemake, block), arg))
 
-    print('args', args)
     if args.build_index == True:
         build_blast_index(args.fasta, args.outname)
     else:
-        print('subject fasta', args.subject_fasta)
-        print('query fasta', args.query_fasta)
-        print('outname', args.outname)
         run_blast(args.subject_fasta, args.query_fasta, args.outname)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
 
 #the subject needs to be the name of the fasta, the query is the .fa file
-
-#https://stackoverflow.com/questions/8525765/load-parameters-from-a-file-in-python
-#apparently you can just have a a very simple parameter file like that
-
-#http://genome.ucsc.edu/blog/the-ucsc-genome-browser-coordinate-counting-systems/
-#UCSC genome coordinates
-#I think blast is 1-based, but maybe have to check

@@ -57,7 +57,6 @@ def generate_kmers(fastafile, klength, outdir, outname):
     These will not be output because they will be screened out anyway in a downstream
     probe design step.
     '''
-    print('using klength %s' % klength)
     target = str(next(SeqIO.parse(fastafile, 'fasta')).seq)
     kmers = []
     for i in range(0, len(target) - klength + 1):
@@ -220,9 +219,6 @@ def main(arglist):
             blast_df_txt = blast_kmers(kmer_file_dict[probe_len], args.txt_fasta[i], aln_check_dir, 'probelen_%snt_cdna' % probe_len, min_bitscore = args.min_bitscore)
             masked_indices_txt, filtered_df_txt = ol_alnmts(blast_df_txt, homol_csv = args.txt_homology_file[i], discard_minus_strand = True)
             masked_start_l.append({probe_len: masked_indices_txt})
-
-            #print('not in cdna', masked_indices_genome.difference(masked_indices_txt))
-            #print('not in genome', masked_indices_txt.difference(masked_indices_genome))
 
     #get the union of all masked starts from all probe lengths and all species
     all_masked_start_dict = {k: set() for k in set().union(*masked_start_l)}

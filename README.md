@@ -8,7 +8,7 @@ the predicted non-specific targeting.
 
 ## Authors
 
-* Mary K Thompson (@marykthompson)
+* Mary Kay Thompson (@marykthompson)
 * Maria Kiourlappou (@mkiourlappou)
 
 ## Usage
@@ -61,9 +61,11 @@ Navigate to the ribopop_probe_design directory.
 If using conda:
 
 Activate your snakemake environment:
+
     conda activate probe_design
 
 Run the pipeline:
+
     snakemake --directory <your output directory> --use-conda
 
 If not using conda, omit the --use-conda option.
