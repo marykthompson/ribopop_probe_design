@@ -8,20 +8,20 @@ import os
 import sys
 import pandas as pd
 from collections import defaultdict
+from pathlib import Path
 
 def build_blast_index(fasta_file, title):
+    print('building index')
     subprocess.run(['makeblastdb', '-in', fasta_file, '-parse_seqids', '-title', title, '-dbtype', 'nucl'], shell = False)
-    #this works, so what's up??
-    #makeblastdb -in testwget9/Mito_genome.fa -parse_seqids -title testmito -dbtype nucl
+    #create file to show snakemake that the index is completed
+    touch_file = os.path.join(os.getcwd(), '%s_completed.txt' % title)
+    Path(touch_file).touch()
 
 def run_blast(subject_fasta, query_fasta, outname):
-    #I cannot figure out how to get it to run with the fields and shell=False but I'm not confortable outputting without a header and always expecting the same order
-    #outfile = '{outname}.csv'.format(outname = outname)
     temp_csv = '{outname}.csv'.format(outname = outname)
     cmd = ' '.join(['blastn', '-db', subject_fasta, '-query', query_fasta, '-outfmt', '10', '-out', temp_csv])
     subprocess.check_call(cmd, shell = True)
     df = pd.read_csv(temp_csv, names = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore'])
-    #blast_csv = '{outname}_blast.csv'.format(outname = outname)
     df.to_csv(outname)
     os.remove(temp_csv)
 

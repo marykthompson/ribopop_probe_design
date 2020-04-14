@@ -1,6 +1,7 @@
 #Snakefile to design oligos for Ribopop
 import pandas as pd
 import os
+import glob
 
 snakedir = workflow.basedir
 configfile: 'config.yml'
@@ -97,9 +98,9 @@ rule build_index_genome:
         fasta = 'offtarget_filtering/{org}/genome.fa'
     params:
         build_index = True,
-        outname = 'genometest'
+        outname = 'offtarget_filtering/{org}/genome'
     output:
-        an_index_file = 'offtarget_filtering/{org}/genome.fa.nhr'
+        an_index_file = 'offtarget_filtering/{org}/genome_completed.txt'
     conda:
         'envs/probe_design.yaml'
     script:
@@ -119,9 +120,9 @@ rule build_index_transcripts:
         fasta = 'offtarget_filtering/{org}/txts.fa'
     params:
         build_index = True,
-        outname = 'txttest'
+        outname = 'offtarget_filtering/{org}/txts'
     output:
-        an_index_file = 'offtarget_filtering/{org}/txts.fa.nhr'
+        an_index_file = 'offtarget_filtering/{org}/txts_completed.txt'
     conda:
         'envs/probe_design.yaml'
     script:
@@ -129,7 +130,7 @@ rule build_index_transcripts:
 
 rule make_rRNA_homology_genome:
     input:
-        an_index_file = 'offtarget_filtering/{org}/genome.fa.nhr',
+        an_index_file = 'offtarget_filtering/{org}/genome_completed.txt',
         subject_fasta = 'offtarget_filtering/{org}/genome.fa',
         query_fasta = 'target_sequences/aln_by_org/{org}/{target}.fa'
     output:
@@ -141,7 +142,7 @@ rule make_rRNA_homology_genome:
 
 rule make_rRNA_homology_txts:
     input:
-        an_index_file = 'offtarget_filtering/{org}/txts.fa.nhr',
+        an_index_file = 'offtarget_filtering/{org}/txts_completed.txt',
         subject_fasta = 'offtarget_filtering/{org}/txts.fa',
         query_fasta = 'target_sequences/aln_by_org/{org}/{target}.fa'
     output:
@@ -155,7 +156,7 @@ rule make_rRNA_homology_txts:
 #you still just give it the fasta file and it looks for the related files in the same directory
 rule mask_nts:
     input:
-        some_index_files = expand(['offtarget_filtering/{org}/genome.fa.nhr', 'offtarget_filtering/{org}/txts.fa.nhr'], org = orgs),
+        some_index_files = expand(['offtarget_filtering/{org}/genome_completed.txt', 'offtarget_filtering/{org}/txts_completed.txt'], org = orgs),
         target_fasta = 'target_sequences/consensus/{target}.fa',
         genome_fasta = expand('offtarget_filtering/{org}/genome.fa', org = orgs),
         txt_fasta = expand('offtarget_filtering/{org}/txts.fa', org = orgs),
@@ -169,7 +170,7 @@ rule mask_nts:
         min_bitscore = config['min_bitscore'],
         outdir = 'offtarget_filtering/masked/{target}'
     output:
-        outfile = "offtarget_filtering/masked/{target}_masked.csv" #doesn't work only uses one target
+        outfile = "offtarget_filtering/masked/{target}_masked.csv"
     conda:
         'envs/probe_design.yaml'
     script:
