@@ -35,7 +35,6 @@ def main(arglist):
     alignment = alignment_funcs.write_alignment(fasta, name, outfile)
     adj_dfs = []
     for rec in alignment:
-
         excluded_region_string = target_df.loc[target_df['ID'] == rec.id, 'excluded_regions'].values[0]
         if not pd.isnull(excluded_region_string):
             excluded_regions = alignment_funcs.get_subregion_ranges(excluded_region_string)
