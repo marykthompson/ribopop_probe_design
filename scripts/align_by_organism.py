@@ -8,7 +8,6 @@ import pandas as pd
 import os
 import alignment_funcs
 
-
 def adjust_indices(id, regions, alignment, name, region_type):
     '''
     Convert regions [[start1, end1], [start2, end2], [], ...]

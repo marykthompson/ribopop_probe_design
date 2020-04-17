@@ -46,7 +46,9 @@ def write_alignment(fasta, name, outname):
         num_seqs = len([1 for line in f if line.startswith(">")])
 
     if num_seqs == 1:
-        record = SeqIO.parse(fasta, 'fasta')
+        record = next(SeqIO.parse(fasta, 'fasta'))
+        record.id = name
+        record.description = ''
         SeqIO.write(record, outname, 'fasta')
         AlignIO.convert(fasta, 'fasta', '%s.clustal' % outname, 'clustal')
         alignment = AlignIO.read('%s.clustal' % outname, 'clustal')
