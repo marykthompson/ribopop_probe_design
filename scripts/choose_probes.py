@@ -50,6 +50,8 @@ def remove_bad_probes(df, dimer_min_dG, all_selected_probes, filter = True):
     '''
     combo_df = df.append(all_selected_probes)
     combo_df[['dimer_dG','dimer_partner']] = calc_dimer(combo_df)
+    #don't modify or drop values from the original df
+    df = df.copy()
     df[['dimer_dG', 'dimer_partner']] = combo_df[['dimer_dG','dimer_partner']]
     df.sort_values('dimer_dG', inplace = True)
 
@@ -181,7 +183,7 @@ def main(arglist):
     '''
     #columns to output after analysis
     col_order = ['sequence', 'target_name',  'target_start',  'target_end', 'length',
-    'unique_id', 'Tm', 'GC_content', 'A_content', 'C_content', 'rolling_Tm_quantile_co', 
+    'unique_id', 'Tm', 'GC_content', 'A_content', 'C_content', 'rolling_Tm_quantile_co',
     'hairpin_dG', 'dimer_dG', 'dimer_partner']
 
     probe_csvs = snakemake.input['probe_csvs']
