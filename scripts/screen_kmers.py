@@ -96,21 +96,24 @@ def Tm_from_position(seq, length, salt_conc):
     probe_df['target_end'] = probe_df['end']
     return probe_df
 
-def quantile_filter(df, window_size, Tm_quantile, min_probe_len, max_probe_len):
+def quantile_filter(df, original_df, window_size, Tm_quantile, min_probe_len, max_probe_len):
     '''
     Calculate a rolling Tm quantile and determine if the probe passes the
-    quantile threshold. The quantile assumes that the df length is equivalent
-    to the sequence length * number of probe lengths. Therefore it should be
-    run first before dropping any bad probes.
+    quantile threshold. Set the Tms of the failed probes to NaN so that
+    the quantile will be calculated relative to original position in the sequence
+    but the failed probes will not be included in the calculation.
     '''
-    #Calculate rolling Tm quantile and find high Tm probes.
-    df = df.sort_values('start', ascending = True)
+    quantile_df = original_df.sort_values('start', ascending = True)
+    failed_idx = quantile_df.index.difference(df.index)
+    quantile_df.loc[failed_idx, 'Tm'] = np.nan
     #window size is adjusted here to be scaled to the number of probes per position
     window_size = window_size * (max_probe_len - min_probe_len + 1)
     #Calculate the Tm of the provided quantile at each position
-    df['rolling_Tm_quantile_co'] = df['Tm'].rolling(
+    quantile_df['rolling_Tm_quantile_co'] = quantile_df['Tm'].rolling(
     window_size, center = True, min_periods = 1).quantile(Tm_quantile)
-    df['passed_Tm_quantile'] = df['Tm'] > df['rolling_Tm_quantile_co']
+    quantile_df['passed_Tm_quantile'] = quantile_df['Tm'] > quantile_df['rolling_Tm_quantile_co']
+    df['rolling_Tm_quantile_co'] = quantile_df['rolling_Tm_quantile_co']
+    df['passed_Tm_quantile'] = quantile_df['passed_Tm_quantile']
     return df[df['passed_Tm_quantile']]
 
 def structure_filter(df, hairpin_min, dimer_min, Na_conc, filter = True):
@@ -216,37 +219,41 @@ def main(arglist):
 
     kmer_df = scan_sequence(target_name, target_seq, args.min_probe_len, args.max_probe_len, args.Na_conc)
 
-    logging.info('Starting with %s potential probes.' % len(kmer_df))
+    #keep kmer_df as the original one and df as the one to be filtered.
+    df = kmer_df.copy()
+    df.dropna(subset = ['Tm'], inplace = True)
 
-    #leave the nans in for the Tm quantile so that it uses the nt window correctly
-    print('filtering by Tm quantile')
-    kmer_df = quantile_filter(kmer_df, args.Tm_window_size, args.Tm_quantile,
-    args.min_probe_len, args.max_probe_len)
-    logging.info('%s potential probes remaning after Tm quantile filter.' % len(kmer_df))
-    kmer_df.dropna(subset = ['Tm'], inplace = True)
-
-    print('filtering by Tm window')
-    kmer_df = Tm_window_filter(kmer_df, args.min_Tm, args.max_Tm)
-    logging.info('%s potential probes remaning after Tm window filter.' % len(kmer_df))
+    logging.info('Starting with %s potential probes.' % len(df))
 
     print('removing probes in excluded regions')
     ex_calc = exdf.loc[exdf['region_type'] == 'excluded_regions', ['start', 'end']].values
-    kmer_df = excluded_nt_filter(kmer_df, args.min_probe_len, args.max_probe_len, excluded = ex_calc, excluded_consensus = args.excluded_regions_consensus)
-    logging.info('%s potential probes remaning after excluding excluded regions.' % len(kmer_df))
+    df = excluded_nt_filter(df, args.min_probe_len, args.max_probe_len, excluded = ex_calc, excluded_consensus = args.excluded_regions_consensus)
+    logging.info('%s potential probes remaning after excluding excluded regions.' % len(df))
 
     print('filtering by structure filter')
-    kmer_df = structure_filter(kmer_df, args.min_hairpin_dG, args.min_dimer_dG, args.Na_conc, filter = True)
-    logging.info('%s potential probes remaning after structure filter.' % len(kmer_df))
+    df = structure_filter(df, args.min_hairpin_dG, args.min_dimer_dG, args.Na_conc, filter = True)
+    logging.info('%s potential probes remaning after structure filter.' % len(df))
 
     print('filtering by sequence composition')
-    kmer_df = sequence_composition_filter(kmer_df, args.sequence_filter_rules, filter = True)
-    logging.info('%s potential probes remaning after sequence composition filter.' % len(kmer_df))
+    df = sequence_composition_filter(df, args.sequence_filter_rules, filter = True)
+    logging.info('%s potential probes remaning after sequence composition filter.' % len(df))
+
+    #only perform quantile filtering on the remaining probes
+    print('filtering by Tm quantile')
+    df = quantile_filter(df, kmer_df, args.Tm_window_size, args.Tm_quantile,
+    args.min_probe_len, args.max_probe_len)
+    logging.info('%s potential probes remaning after Tm quantile filter.' % len(df))
+
+    #further filter out ones not in specified Tm range.
+    print('filtering by Tm window')
+    df = Tm_window_filter(df, args.min_Tm, args.max_Tm)
+    logging.info('%s potential probes remaning after Tm window filter.' % len(df))
 
     #write a csv file for later to take the probe properties from.
     #write a kmer fasta file to use for the blast check.
-    kmer_df.to_csv(args.probe_csv)
+    df.to_csv(args.probe_csv)
     with open(args.probe_fa, 'w') as f:
-        for i in kmer_df.itertuples():
+        for i in df.itertuples():
             f.write('>%s\n%s\n' % (i.Index, i.target_sequence))
 
 if __name__ == '__main__':
