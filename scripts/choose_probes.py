@@ -142,7 +142,8 @@ def prune(df, desired_number_probes, target_len, subregions = None):
     pruned_df = pd.concat(chosen_probes)
     return pruned_df
 
-def summarize_results(df, final_df, target_len, col_order, outfile):
+def summarize_results(df, final_df, target_len, outfile):
+
     '''
     Write the final selected probes, plot the selected regions.
     '''
@@ -172,9 +173,7 @@ def summarize_results(df, final_df, target_len, col_order, outfile):
 
     plt.tight_layout()
 
-    plotfile = '%s.png' % os.path.splitext(outfile)[0]
-    plt.savefig(plotfile, dpi = 600)
-    final_df.reset_index()[col_order].to_csv(outfile, index = False)
+    plt.savefig(outfile, dpi = 600)
 
 def main(arglist):
     '''
@@ -184,7 +183,7 @@ def main(arglist):
     #columns to output after analysis
     col_order = ['sequence', 'target_name',  'target_start',  'target_end', 'length',
     'unique_id', 'Tm', 'GC_content', 'A_content', 'C_content', 'rolling_Tm_quantile_co',
-    'hairpin_dG', 'dimer_dG', 'dimer_partner']
+    'hairpin_dG', 'homodimer_dG', 'dimer_dG', 'dimer_partner']
 
     probe_csvs = snakemake.input['probe_csvs']
     target_fastas = snakemake.input['target_fastas']
@@ -193,7 +192,7 @@ def main(arglist):
     desired_number_probes = snakemake.params['desired_number_probes']
     target_subregions_consensus = snakemake.params['target_subregions_consensus']
     min_dimer_dG = snakemake.params['min_dimer_dG']
-    selected_probes_files = snakemake.output['selected_probes']
+    selected_probes_plots = snakemake.output['plots']
     all_selected_probes_file = snakemake.output['all_selected_probes']
 
     num_targets = len(target_fastas)
@@ -201,7 +200,6 @@ def main(arglist):
     target_lens = [len(next(SeqIO.parse(i, 'fasta'))) for i in target_fastas]
 
     all_selected_probes = pd.DataFrame()
-    starting_index = 0
 
     logging.basicConfig(level=logging.DEBUG, filename = logfile,
     filemode = 'w', format = '%(message)s')
@@ -243,7 +241,7 @@ def main(arglist):
         screened_df[['dimer_dG','dimer_partner']], left_index = True, right_index = True)
         logging.info("%s probes selected." % len(final_df))
         all_selected_probes = all_selected_probes.append(final_df)
-        summarize_results(df, final_df, target_lens[i], col_order, selected_probes_files[i])
+        summarize_results(df, final_df, target_lens[i], selected_probes_plots[i])
 
     #write the combined output file with probes selected for all targets.
     all_selected_probes.sort_values(by = ['target_name', 'target_start'], inplace = True)
@@ -252,7 +250,10 @@ def main(arglist):
     all_selected_probes['probe_num'] += 1
     cols = ['probe_num']
     cols.extend(col_order)
-    all_selected_probes[cols].to_csv(all_selected_probes_file, index = False)
+    other_cols = df.columns.values
+    rule_cols = [i for i in other_cols if i.endswith('rule')]
+    cols.extend(rule_cols)
+    all_selected_probes[cols].round(2).to_csv(all_selected_probes_file, index = False)
 
 if __name__ == '__main__':
     main(sys.argv[1:])

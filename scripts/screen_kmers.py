@@ -26,7 +26,7 @@ def Tm_window_filter(df, min_tm, max_tm):
     passed_df = sorted_df.iloc[passed_indices[0]: passed_indices[1]].copy()
     return passed_df
 
-def sequence_composition_filter(df, rules, filter = True):
+def sequence_composition_filter(df, min_gc, max_gc, rules, filter = True):
     '''
     Remove sequences with homopolymeric repeats and other issues described in the rules.
     If filter == True, then it will replace the probe_df with filtered probes only.
@@ -37,7 +37,7 @@ def sequence_composition_filter(df, rules, filter = True):
     df['A_content'] = df['sequence'].apply(lambda x: x.count('A')/len(x))
     df['C_content'] = df['sequence'].apply(lambda x: x.count('C')/len(x))
     #Set to True if the probe has this characteristic
-    df['GC_content_rule'] = df.apply(lambda x: 0.4 > x['GC_content'] or x['GC_content'] > 0.6, axis = 1)
+    df['GC_content_rule'] = df.apply(lambda x: min_gc > x['GC_content'] or x['GC_content'] > max_gc, axis = 1)
     df['A_composition_rule'] = df.apply(lambda x: x['A_content'] > 0.28, axis = 1)
     df['C_composition_rule'] = df.apply(lambda x: 0.22 > x['C_content'] or x['C_content'] > 0.28, axis = 1)
     df['4xA_stack_rule'] = df['sequence'].apply(lambda x: 'AAAA' in x)
@@ -181,6 +181,8 @@ def main(arglist):
     parser.add_argument('-max_probe_len', type = int, default = 35)
     parser.add_argument('-min_Tm', type = int, default = 0)
     parser.add_argument('-max_Tm', type = int, default = 10000)
+    parser.add_argument('-min_gc', type = float, default = 0.4)
+    parser.add_argument('-max_gc', type = float, default = 0.6)
     parser.add_argument('-outdir', help = 'name of output directory')
     parser.add_argument('-Tm_quantile', type = float, default = 0.9, help = 'Tm of probe must be above this quantile to be selected')
     parser.add_argument('-Tm_window_size', type = int, default = 200, help ='# nt to include in calculating the Tm quantile')
@@ -235,7 +237,7 @@ def main(arglist):
     logging.info('%s potential probes remaning after structure filter.' % len(df))
 
     print('filtering by sequence composition')
-    df = sequence_composition_filter(df, args.sequence_filter_rules, filter = True)
+    df = sequence_composition_filter(df, args.min_gc, args.max_gc, args.sequence_filter_rules, filter = True)
     logging.info('%s potential probes remaning after sequence composition filter.' % len(df))
 
     #only perform quantile filtering on the remaining probes

@@ -1,7 +1,6 @@
 #Snakefile to design oligos for Ribopop
 import pandas as pd
 import os
-import glob
 
 snakedir = workflow.basedir
 configfile: 'config.yml'
@@ -22,7 +21,8 @@ def get_targets(wildcards):
 
 rule all:
     input:
-        selected_probes = expand('probe_design/{target}/selected_probes_{target}.csv', target = targets),
+        all_selected_probes = 'probe_design/all_selected_probes.csv',
+        plots = expand('probe_design/{target}/selected_probes_{target}.png', target = targets)
 
 #get target sequences out of the ncrna file or other provided file
 rule extract_targets:
@@ -185,6 +185,8 @@ rule screen_kmers:
         max_probe_len = lambda wildcards: param_df.loc[wildcards.target, 'max_probe_length'],
         min_Tm = lambda wildcards: param_df.loc[wildcards.target, 'min_Tm'],
         max_Tm = lambda wildcards: param_df.loc[wildcards.target, 'max_Tm'],
+        min_gc = lambda wildcards: param_df.loc[wildcards.target, 'min_GC'],
+        max_gc = lambda wildcards: param_df.loc[wildcards.target, 'max_GC'],
         Tm_quantile = lambda wildcards: param_df.loc[wildcards.target, 'Tm_quantile'],
         Tm_window_size = lambda wildcards: param_df.loc[wildcards.target, 'Tm_window_size'],
         min_hairpin_dG = lambda wildcards: param_df.loc[wildcards.target, 'min_hairpin_dG'],
@@ -211,7 +213,7 @@ rule choose_probes:
         target_subregions_consensus = param_df.loc[targets, 'target_subregions_consensus'],
         min_dimer_dG = param_df.loc[targets, 'min_dimer_dG']
     output:
-        selected_probes = expand('probe_design/{target}/selected_probes_{target}.csv', target = targets),
+        plots = expand('probe_design/{target}/selected_probes_{target}.png', target = targets),
         all_selected_probes = 'probe_design/all_selected_probes.csv'
     conda:
         'envs/probe_design.yaml'
