@@ -23,6 +23,21 @@ class NotEnoughSpaceException(Exception):
     '''
     pass
 
+def dist_from_neighbors(s):
+    '''
+    Get simple metric of distance from neighbors.
+    A higher number means that neighbors are further away.
+    '''
+    s2 = s.sort_values(ascending = True)
+    idx = s2.index
+    a = s2.values
+    dist = a[1:] - a[:-1]
+    rdist = np.append(dist, dist[-1])
+    ldist = np.append(dist[0], dist)
+    m = np.mean([rdist, ldist], axis = 0)
+    new_s = pd.Series(m, index = idx)
+    return new_s
+
 def calc_dimer(df):
     '''
     Calculate the dimer dG between each probe and each other probe. Add the
@@ -54,13 +69,27 @@ def remove_bad_probes(df, dimer_min_dG, all_selected_probes, filter = True):
     df = df.copy()
     df[['dimer_dG', 'dimer_partner']] = combo_df[['dimer_dG','dimer_partner']]
     df.sort_values('dimer_dG', inplace = True)
+    dg_col = df.columns.get_loc('dimer_dG')
 
     if filter == False:
         return df
+
     while df.iloc[0, df.columns.get_loc('dimer_dG')] < dimer_min_dG:
-        #choose between the top 2 rows to find one with the lower Tm
-        lower_tm_idx = df.iloc[[0, 1], df.columns.get_loc('Tm')].idxmin()
-        df.drop(lower_tm_idx, inplace = True)
+
+        print(df)
+
+        #modify df or just get dist from neighbors as a series?
+        dist_from_nbrs = dist_from_neighbors(df['start'])
+
+        #check if the top two dG values are the same (means from the same target)
+        if df.iloc[0, dg_col] == df.iloc[1, dg_col]:
+            indices = df.iloc[[0,1]].index
+            #choose between the top 2 rows to find one with the lower distance between neighbors
+            lower_dist_idx = dist_from_nbrs.loc[indices].idxmin()
+            df.drop(lower_dist_idx, inplace = True)
+        #otherwise, drop the probe with the most negative dG
+        else:
+            df.drop(df.index[0], inplace = True)
         df.drop('dimer_dG', axis = 1, inplace = True)
 
         #try again with all the problematic probes removed
@@ -228,7 +257,7 @@ def main(arglist):
             #get evenly spaced probes from the passed ones
             pruned_df = prune(df, desired_number_probes[i], target_lens[i], subregions = target_subregions)
             #drop rows causing the low dimer dG scores
-            print('removing probes with dimer clashes')
+            logging.info('removing probes with dimer clashes')
             screened_df = remove_bad_probes(pruned_df, min_dimer_dG[i], all_selected_probes)
             #get indices of the pruned probes that don't survive heterodimer screening
             removed_idx = pruned_df.index.difference(screened_df.index)

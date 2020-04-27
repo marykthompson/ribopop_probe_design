@@ -18,26 +18,7 @@ the predicted non-specific targeting.
 To simply download the workflow, go to the 'Clone or download' tab and download
 the ZIP file.
 
-### Step 2: (Recommended) Install Conda
-
-If you use conda, you will not need to pre-install each required package.
-We recommend the miniconda distribution. Please see here for instructions
-on how to install miniconda for your operating system.
-https://docs.conda.io/en/latest/miniconda.html
-
-### Step 3: Install Snakemake
-
-If you're using conda, you can install snakemake as follows from the command line:
-
-    conda create -n probe_design -c bioconda snakemake
-
-This command will install snakemake into a new conda environment called probe_design.
-
-If you're not using conda, you will need to install snakemake as well as all the other
-software listed in envs/probe_design.yaml in advance of running the workflow using
-your preferred installation method.
-
-### Step 4: Prepare the design parameter files
+### Step 2: Prepare the design parameter files
 
 Prepare an output directory. Prepare a config.yml file matching the format of example_outdir/config.yml. You need to prepare the following simple csv files, matching the format of those in example_outdir/design_params/
 
@@ -54,18 +35,28 @@ in the same fasta file or to provide them in separate fasta files. If the fasta 
 for each target, etc. The excluded_regions and target_subregions can instead be specified in this file
 as excluded_regions_consensus and target_subregions_consensus, but then the indices must be relative to the consensus sequence.
 
-### Step 5: Run the design pipeline
+### Step 3: (Recommended) Install Conda
 
-Navigate to the ribopop_probe_design directory.
+If you use conda, you will not need to pre-install each required package.
+We recommend the miniconda distribution. Please see here for instructions
+on how to install miniconda for your operating system.
+https://docs.conda.io/en/latest/miniconda.html
 
-If using conda:
+### Step 4: Set up the conda environment.
 
-Activate your snakemake environment:
+Create the probe design environment.
 
-    conda activate probe_design
+    conda env create -f ribopop_probe_design.yaml
 
-Run the pipeline:
+### Step 5: Run the pipeline.
 
-    snakemake --directory <your output directory> --use-conda
+Activate the probe design environment.
 
-If not using conda, omit the --use-conda option.
+    conda activate ribopop_probe_design
+
+Run the pipeline.
+
+    snakemake --directory <your output directory>
+
+If you're not using conda, you will need to install snakemake as well as all the other
+software listed in envs/ribopop_probe_design.yaml in advance of running the workflow using your preferred installation method.

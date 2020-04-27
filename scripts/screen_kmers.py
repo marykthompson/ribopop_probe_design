@@ -96,7 +96,7 @@ def Tm_from_position(seq, length, salt_conc):
     probe_df['target_end'] = probe_df['end']
     return probe_df
 
-def quantile_filter(df, original_df, window_size, Tm_quantile, min_probe_len, max_probe_len):
+def quantile_filter(df, original_df, window_size, Tm_quantile, min_probe_len, max_probe_len, filter = True):
     '''
     Calculate a rolling Tm quantile and determine if the probe passes the
     quantile threshold. Set the Tms of the failed probes to NaN so that
@@ -114,7 +114,9 @@ def quantile_filter(df, original_df, window_size, Tm_quantile, min_probe_len, ma
     quantile_df['passed_Tm_quantile'] = quantile_df['Tm'] > quantile_df['rolling_Tm_quantile_co']
     df['rolling_Tm_quantile_co'] = quantile_df['rolling_Tm_quantile_co']
     df['passed_Tm_quantile'] = quantile_df['passed_Tm_quantile']
-    return df[df['passed_Tm_quantile']]
+    if filter == True:
+        df = df[df['passed_Tm_quantile']].copy()
+    return df
 
 def structure_filter(df, hairpin_min, dimer_min, Na_conc, filter = True):
     '''
@@ -130,7 +132,7 @@ def structure_filter(df, hairpin_min, dimer_min, Na_conc, filter = True):
         df = df[df['passed_structure']].copy()
     return df
 
-def excluded_nt_filter(df, min_probe_len, max_probe_len, excluded = None, excluded_consensus = None):
+def excluded_nt_filter(df, min_probe_len, max_probe_len, excluded = None, excluded_consensus = None, filter = True):
     '''
     Remove probes in user-provided excluded regions, for example regions of high
     tertiary structure. Can be from excluded (calculated in pipeline relative to
@@ -167,7 +169,9 @@ def excluded_nt_filter(df, min_probe_len, max_probe_len, excluded = None, exclud
 
     #Check if potential probe start is masked:
     df['passed_excluded'] = df.apply(lambda x: (x['start'] not in bad_start_dict[x['length']] if x['length'] in bad_start_dict else True), axis = 1)
-    return df[df['passed_excluded']]
+    if filter == True:
+        df = df[df['passed_excluded']].copy()
+    return df
 
 def main(arglist):
     #The sequence composition rules

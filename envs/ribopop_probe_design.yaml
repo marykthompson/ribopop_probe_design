@@ -1,8 +1,10 @@
+name: ribopop_probe_design
 channels:
   - bioconda
   - conda-forge
   - defaults
 dependencies:
+  - snakemake
   - python>=3.6
   - blast
   - primer3-py

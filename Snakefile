@@ -30,10 +30,8 @@ rule extract_targets:
         fasta_file = 'offtarget_filtering/{org}/ncrna.fa'
     params:
         sub_target_df = lambda wildcards: target_df[(target_df['target'] == wildcards.target) & (target_df['organism'] == wildcards.org)]
-    conda:
-        'envs/probe_design.yaml'
     output:
-        "target_sequences/original/{org}/{target}.fa"
+        'target_sequences/original/{org}/{target}.fa'
     script:
         'scripts/extract_target_seqs.py'
 
@@ -47,22 +45,18 @@ rule make_alignment_by_organism:
     output:
         outfasta = 'target_sequences/aln_by_org/{org}/{target}.fa',
         excluded1 = temp('target_sequences/{org}-{target}.excluded1')
-    conda:
-        'envs/probe_design.yaml'
     script:
         'scripts/align_by_organism.py'
 
 rule make_alignment_by_target:
     input:
-        fastas = expand("target_sequences/aln_by_org/{org}/{{target}}.fa", org = orgs),
+        fastas = expand('target_sequences/aln_by_org/{org}/{{target}}.fa', org = orgs),
         excluded_regions_files = expand('target_sequences/{org}-{{target}}.excluded1', org = orgs)
     params:
-        name = "{target}"
+        name = '{target}'
     output:
-        outfasta = "target_sequences/consensus/{target}.fa",
+        outfasta = 'target_sequences/consensus/{target}.fa',
         excluded2 = 'target_sequences/{target}.excluded.csv'
-    conda:
-        'envs/probe_design.yaml'
     script:
         'scripts/align_by_target.py'
 
@@ -72,8 +66,6 @@ rule tantan_mask:
         'target_sequences/consensus/{target}.fa'
     output:
         'target_sequences/masked/{target}.fa'
-    conda:
-        'envs/probe_design.yaml'
     shell:
         'tantan -x N {input} > {output}'
 
@@ -87,8 +79,6 @@ rule download_seqs:
     params:
         outdir = 'offtarget_filtering/{org}/',
         to_download = {'genome':'genome.fa', 'cdna': 'cdna.fa', 'ncrna':'ncrna.fa', 'gtf': 'ann.gtf'}
-    conda:
-        'envs/probe_design.yaml'
     script:
         'scripts/download_seqs.py'
 
@@ -101,8 +91,6 @@ rule extract_intronic_seqs:
         flanking_nt = 40
     output:
         outfasta = temp('offtarget_filtering/{org}/introns.fa')
-    conda:
-        'envs/probe_design.yaml'
     script:
         'scripts/extract_intronic_seqs.py'
 
@@ -126,8 +114,6 @@ rule build_index_transcripts:
         outname = 'offtarget_filtering/{org}/txts'
     output:
         an_index_file = 'offtarget_filtering/{org}/txts_completed.txt'
-    conda:
-        'envs/probe_design.yaml'
     script:
         'scripts/run_blastn.py'
 
@@ -141,8 +127,6 @@ rule make_rRNA_homology_target:
         blast_txts = True
     output:
         outfile = 'offtarget_filtering/{org}/{target}-homology_target_blast.csv'
-    conda:
-        'envs/probe_design.yaml'
     script:
         'scripts/run_blastn.py'
 
@@ -157,8 +141,6 @@ rule make_rRNA_homology_kmers:
         min_bitscore = config['min_bitscore']
     output:
         outfile = 'offtarget_filtering/{org}/{target}-homology_kmers_blast.csv'
-    conda:
-        'envs/probe_design.yaml'
     script:
         'scripts/run_blastn.py'
 
@@ -170,8 +152,6 @@ rule remove_homologous_kmers:
         target_homology_files = expand('offtarget_filtering/{org}/{{target}}-homology_target_blast.csv', org = orgs)
     output:
         filtered_probe_csv = 'probe_design/{target}/potential_probes_filt.csv'
-    conda:
-        'envs/probe_design.yaml'
     script:
         'scripts/filter_probes.py'
 
@@ -196,8 +176,6 @@ rule screen_kmers:
     output:
         probe_csv = 'probe_design/{target}/potential_probes.csv',
         probe_fa = 'probe_design/{target}/potential_probes.fa'
-    conda:
-        'envs/probe_design.yaml'
     script:
         'scripts/screen_kmers.py'
 
@@ -215,7 +193,5 @@ rule choose_probes:
     output:
         plots = expand('probe_design/{target}/selected_probes_{target}.png', target = targets),
         all_selected_probes = 'probe_design/all_selected_probes.csv'
-    conda:
-        'envs/probe_design.yaml'
     script:
         'scripts/choose_probes.py'
