@@ -1,0 +1,3 @@
+﻿target,organism,ID,excluded_regions,target_subregions,file
+18S,Scer,RDN18-1_rRNA,"214-251,814-856",,/Users/maryk.thompson/Desktop/Davislab/OneDriveNexus365/2.25_rRNA_sub_2b/scripts/testyeast4/offtarget_filtering/Scer/temp_ncrna.fa
+18S,Scer,RDN18-2_rRNA,,,/Users/maryk.thompson/Desktop/Davislab/OneDriveNexus365/2.25_rRNA_sub_2b/scripts/testyeast4/offtarget_filtering/Scer/temp_ncrna.fa

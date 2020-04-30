@@ -5,3 +5,4 @@ targets: targets.csv
 params: params.csv
 offtarget_screening: True
 min_bitscore: 32
+evalue: 50

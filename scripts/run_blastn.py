@@ -18,7 +18,7 @@ def build_blast_index(fasta_file, title):
     touch_file = os.path.join(os.getcwd(), '%s_completed.txt' % title)
     Path(touch_file).touch()
 
-def blast_kmers(subject_fasta, query_fasta, outfile, min_bitscore = 30, evalue = 10):
+def blast_kmers(subject_fasta, query_fasta, outfile, min_bitscore = 30, evalue = 50):
     '''
     Blast the kmers to genome or cDNA collection with blastn.
     '''
@@ -48,6 +48,7 @@ def main(arglist):
     parser.add_argument('-subject_fasta', help = 'name of fasta file to be searched')
     parser.add_argument('-query_fasta', help = 'name of query fasta file')
     parser.add_argument('-min_bitscore', type = float, default = 30, help = 'only write alignments with >= than this score')
+    parser.add_argument('-evalue', type = float, default = 50, help = 'use this as the E-value cutoff for the blast search.')
     parser.add_argument('-outfile', help ='name for csv output file')
     args = parser.parse_args()
 
@@ -61,7 +62,7 @@ def main(arglist):
     elif args.blast_txts:
         blast_txts(args.subject_fasta, args.query_fasta, args.outfile)
     elif args.blast_kmers:
-        blast_kmers(args.subject_fasta, args.query_fasta, args.outfile, min_bitscore = args.min_bitscore)
+        blast_kmers(args.subject_fasta, args.query_fasta, args.outfile, min_bitscore = args.min_bitscore, evalue = args.evalue)
 
 if __name__ == '__main__':
     main(sys.argv[1:])

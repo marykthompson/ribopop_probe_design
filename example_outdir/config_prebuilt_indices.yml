@@ -1,0 +1,8 @@
+#config file for probeset if using pre-built transcript indices
+parameter_dir: design_params_prebuilt
+indices: indices.csv
+targets: targets.csv
+params: params.csv
+offtarget_screening: True
+min_bitscore: 32
+evalue: 50

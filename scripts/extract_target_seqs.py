@@ -17,7 +17,12 @@ def collect_seqs_by_id(infasta, ids):
     return records
 
 def main(arglist):
-    infasta = snakemake.input['fasta_file']
+    #if run by use_prebuilt_indices, require file to be input in the targets.csv
+    try:
+        infasta = snakemake.input['fasta_file']
+    except AttributeError:
+        infasta = 'not_a_real_file'
+
     target_df = snakemake.params['sub_target_df']
     outfile = snakemake.output[0]
 

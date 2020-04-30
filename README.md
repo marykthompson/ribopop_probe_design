@@ -60,3 +60,15 @@ Run the pipeline.
 
 If you're not using conda, you will need to install snakemake as well as all the other
 software listed in envs/ribopop_probe_design.yaml in advance of running the workflow using your preferred installation method.
+
+### Additional options ###
+
+It may be desirable to run probe design again on a different set of targets without
+rebuilding the transcript index used for off-target screening. This can be accomplished
+by running a different version of the Snakefile and providing a different parameter
+file called indices.csv. In this case, you must also provide the path to the fasta
+containing your target sequences in the targets.csv file. See example in example_outdir/design_params_prebuilt/
+
+Run the pipeline using a pre-built transcript index:
+
+    snakemake -s use_prebuilt_indices.smk --directory <your output directory>

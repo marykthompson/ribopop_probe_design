@@ -1,11 +1,12 @@
-#Snakefile to design oligos for Ribopop
+#use_prebuilt_indices.smk
+#run this version if you want to design another set of probes using a blast database that is already built.
 import pandas as pd
 import os
 
 snakedir = workflow.basedir
 configfile: 'config.yml'
 
-ann_df = pd.read_csv(os.path.join(config['parameter_dir'], config['seqs_and_annotations'])).set_index('organism', drop = False)
+ann_df = pd.read_csv(os.path.join(config['parameter_dir'], config['indices'])).set_index('organism', drop = False)
 target_df = pd.read_csv(os.path.join(config['parameter_dir'], config['targets']))
 targets = target_df['target'].unique()
 orgs = target_df['organism'].unique()
@@ -24,10 +25,9 @@ rule all:
         all_selected_probes = 'probe_design/all_selected_probes.csv',
         plots = expand('probe_design/{target}/selected_probes_{target}.png', target = targets)
 
-#get target sequences out of the ncrna file or other provided file
+#get target sequences out of the provided file in targets.csv
+#note that for this version, you need to provide the filename in the target sequences file.
 rule extract_targets:
-    input:
-        fasta_file = 'offtarget_filtering/{org}/ncrna.fa'
     params:
         sub_target_df = lambda wildcards: target_df[(target_df['target'] == wildcards.target) & (target_df['organism'] == wildcards.org)]
     output:
@@ -69,59 +69,10 @@ rule tantan_mask:
     shell:
         'tantan -x N {input} > {output}'
 
-#download seqs for the offtarget screening
-rule download_seqs:
-    output:
-        ncrna_file = temp('offtarget_filtering/{org}/ncrna.fa'),
-        cdna_file = temp('offtarget_filtering/{org}/cdna.fa'),
-        gtf_file = temp('offtarget_filtering/{org}/ann.gtf'),
-        genome_file = temp('offtarget_filtering/{org}/genome.fa')
-    params:
-        outdir = 'offtarget_filtering/{org}/',
-        to_download = {'genome':'genome.fa', 'cdna': 'cdna.fa', 'ncrna':'ncrna.fa', 'gtf': 'ann.gtf'}
-    script:
-        'scripts/download_seqs.py'
-
-#extract intronic sequences from the genome to include in the blast database
-rule extract_intronic_seqs:
-    input:
-        genome_fasta = 'offtarget_filtering/{org}/genome.fa',
-        gtf_file = 'offtarget_filtering/{org}/ann.gtf'
-    params:
-        flanking_nt = 40
-    output:
-        outfasta = temp('offtarget_filtering/{org}/introns.fa')
-    script:
-        'scripts/extract_intronic_seqs.py'
-
-#make a combined file of mRNAs, ncRNAs, and intronic sequences
-rule concatenate_transcripts:
-    input:
-        cdna_fasta = 'offtarget_filtering/{org}/cdna.fa',
-        ncrna_fasta = 'offtarget_filtering/{org}/ncrna.fa',
-        intron_fasta = 'offtarget_filtering/{org}/introns.fa'
-    output:
-        txt_fasta = 'offtarget_filtering/{org}/txts.fa'
-    shell:
-        'cat {input.cdna_fasta} {input.ncrna_fasta} {input.intron_fasta} > {output.txt_fasta}'
-
-#build transcript blast index
-rule build_index_transcripts:
-    input:
-        fasta = 'offtarget_filtering/{org}/txts.fa'
-    params:
-        build_index = True,
-        outname = 'offtarget_filtering/{org}/txts'
-    output:
-        an_index_file = 'offtarget_filtering/{org}/txts_completed.txt'
-    script:
-        'scripts/run_blastn.py'
-
 #find regions in transcript db that are homologous to the target --i.e. rRNAs
 rule make_rRNA_homology_target:
     input:
-        an_index_file = 'offtarget_filtering/{org}/txts_completed.txt',
-        subject_fasta = 'offtarget_filtering/{org}/txts.fa',
+        subject_fasta = lambda wildcards: ann_df.loc[wildcards.org, 'transcript_fasta_blast'],
         query_fasta = 'target_sequences/aln_by_org/{org}/{target}.fa'
     params:
         blast_txts = True
@@ -133,8 +84,7 @@ rule make_rRNA_homology_target:
 #find alignments of potential probes with transcripts
 rule make_rRNA_homology_kmers:
     input:
-        an_index_file = 'offtarget_filtering/{org}/txts_completed.txt',
-        subject_fasta = 'offtarget_filtering/{org}/txts.fa',
+        subject_fasta = lambda wildcards: ann_df.loc[wildcards.org, 'transcript_fasta_blast'],
         query_fasta = 'probe_design/{target}/potential_probes.fa'
     params:
         blast_kmers = True,

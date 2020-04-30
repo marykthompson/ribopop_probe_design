@@ -1,0 +1,2 @@
+﻿target,min_probe_length,max_probe_length,min_Tm,max_Tm,Tm_quantile,number_probes,Tm_window_size,target_subregions_consensus,excluded_regions_consensus,min_hairpin_dG,min_dimer_dG,min_GC,max_GC
+18S,26,35,72,90,0.8,5,200,,,-3,-10,0.4,0.6

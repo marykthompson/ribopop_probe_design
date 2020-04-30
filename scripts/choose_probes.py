@@ -75,12 +75,8 @@ def remove_bad_probes(df, dimer_min_dG, all_selected_probes, filter = True):
         return df
 
     while df.iloc[0, df.columns.get_loc('dimer_dG')] < dimer_min_dG:
-
-        print(df)
-
-        #modify df or just get dist from neighbors as a series?
+        #Get a measure of the probes distance from its neighbors
         dist_from_nbrs = dist_from_neighbors(df['start'])
-
         #check if the top two dG values are the same (means from the same target)
         if df.iloc[0, dg_col] == df.iloc[1, dg_col]:
             indices = df.iloc[[0,1]].index
@@ -136,7 +132,7 @@ def prune(df, desired_number_probes, target_len, subregions = None):
         #Add the missing start positons back to but with Tm of 0
         #This way, they will be included in the distance consideration for peak finding
         #but can't be chosen as peaks themselves
-        this_distance = 50
+        this_distance = 100
 
         #start earlier because it cannot choose the endpts
         start_range = range(sub_df['start'].min() - 1, sub_df['start'].max()+ 2)
