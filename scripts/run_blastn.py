@@ -57,6 +57,8 @@ def main(arglist):
     if 'snakemake' in globals():
         args = probe_helpers.set_snake_args(args, snakemake)
 
+    #convert in case snakemake is passing a named list from pandas dataframe
+    args.subject_fasta = str(args.subject_fasta)
     if args.build_index == True:
         build_blast_index(args.fasta, args.outname)
     elif args.blast_txts:

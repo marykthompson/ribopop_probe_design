@@ -4,15 +4,33 @@ import pandas as pd
 import os
 
 snakedir = workflow.basedir
-configfile: 'config.yml'
+thisdir = os.getcwd()
 
-ann_df = pd.read_csv(os.path.join(config['parameter_dir'], config['indices'])).set_index('organism', drop = False)
+configfile: 'config.yml'
+ann_df = pd.read_csv(os.path.join(config['parameter_dir'], config['indices'])).set_index(['organism', 'target'], drop = False)
 target_df = pd.read_csv(os.path.join(config['parameter_dir'], config['targets']))
+param_df = pd.read_csv(os.path.join(config['parameter_dir'], config['params'])).set_index('target', drop = False)
+
 targets = target_df['target'].unique()
 orgs = target_df['organism'].unique()
+index_orgs = ann_df['organism'].unique()
+
 targets.sort()
 orgs.sort()
-param_df = pd.read_csv(os.path.join(config['parameter_dir'], config['params'])).set_index('target', drop = False)
+index_orgs.sort()
+
+#softlink the target_homology files if they are specified in the index file so that they won't
+#be recreated for other organisms if they are not being included in the target consensus
+for i in ann_df.index:
+    homol_file = ann_df.loc[i, 'target_homology']
+    target = ann_df.loc[i, 'target']
+    org = ann_df.loc[i, 'organism']
+    if not pd.isnull(homol_file):
+        new_path = os.path.join(thisdir, f'offtarget_filtering/{org}/{target}-homology_target_blast.csv')
+        os.makedirs(os.path.dirname(new_path), exist_ok = True)
+        if os.path.exists(new_path):
+            os.remove(new_path)
+        os.symlink(homol_file, new_path)
 
 def get_targets(wildcards):
     '''
@@ -72,26 +90,26 @@ rule tantan_mask:
 #find regions in transcript db that are homologous to the target --i.e. rRNAs
 rule make_rRNA_homology_target:
     input:
-        subject_fasta = lambda wildcards: ann_df.loc[wildcards.org, 'transcript_fasta_blast'],
-        query_fasta = 'target_sequences/aln_by_org/{org}/{target}.fa'
+        subject_fasta = lambda wildcards: ann_df.loc[[wildcards.target, wildcards.index_org], 'blast_db'],
+        query_fasta = 'target_sequences/aln_by_org/{index_org}/{target}.fa'
     params:
         blast_txts = True
     output:
-        outfile = 'offtarget_filtering/{org}/{target}-homology_target_blast.csv'
+        outfile = 'offtarget_filtering/{index_org}/{target}-homology_target_blast.csv'
     script:
         'scripts/run_blastn.py'
 
 #find alignments of potential probes with transcripts
 rule make_rRNA_homology_kmers:
     input:
-        subject_fasta = lambda wildcards: ann_df.loc[wildcards.org, 'transcript_fasta_blast'],
+        subject_fasta = lambda wildcards: ann_df.loc[[wildcards.target, wildcards.index_org], 'blast_db'],
         query_fasta = 'probe_design/{target}/potential_probes.fa'
     params:
         blast_kmers = True,
         min_bitscore = config['min_bitscore'],
         evalue = config['evalue']
     output:
-        outfile = 'offtarget_filtering/{org}/{target}-homology_kmers_blast.csv'
+        outfile = 'offtarget_filtering/{index_org}/{target}-homology_kmers_blast.csv'
     script:
         'scripts/run_blastn.py'
 
@@ -99,8 +117,8 @@ rule make_rRNA_homology_kmers:
 rule remove_homologous_kmers:
     input:
         probe_csv = 'probe_design/{target}/potential_probes.csv',
-        kmer_homology_files = expand('offtarget_filtering/{org}/{{target}}-homology_kmers_blast.csv', org = orgs),
-        target_homology_files = expand('offtarget_filtering/{org}/{{target}}-homology_target_blast.csv', org = orgs)
+        kmer_homology_files = expand('offtarget_filtering/{index_org}/{{target}}-homology_kmers_blast.csv', index_org = index_orgs),
+        target_homology_files = expand('offtarget_filtering/{index_org}/{{target}}-homology_target_blast.csv', index_org = index_orgs)
     output:
         filtered_probe_csv = 'probe_design/{target}/potential_probes_filt.csv'
     script:
