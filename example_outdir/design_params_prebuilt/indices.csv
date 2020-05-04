@@ -1,2 +1,3 @@
-﻿organism,transcript_fasta_blast
-Scer,/Users/maryk.thompson/Desktop/Davislab/OneDriveNexus365/2.25_rRNA_sub_2b/scripts/testyeast5/offtarget_filtering/Scer/txts.fa
+﻿organism,target,blast_db,target_homology
+Scer,18S,/Users/maryk.thompson/Desktop/Davislab/ribopop/ribopop_yeast/offtarget_filtering/Scer/txts.fa,/Users/maryk.thompson/Desktop/Davislab/ribopop/ribopop_yeast/offtarget_filtering/Scer/18S-homology_kmers_blast.csv
+Spom,18S,/Users/maryk.thompson/Desktop/Davislab/ribopop/ribopop_yeast/offtarget_filtering/Spom/txts.fa,/Users/maryk.thompson/Desktop/Davislab/ribopop/ribopop_yeast/offtarget_filtering/Spom/18S-homology_kmers_blast.csv

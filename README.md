@@ -67,7 +67,9 @@ It may be desirable to run probe design again on a different set of targets with
 rebuilding the transcript index used for off-target screening. This can be accomplished
 by running a different version of the Snakefile and providing a different parameter
 file called indices.csv. In this case, you must also provide the path to the fasta
-containing your target sequences in the targets.csv file. See example in example_outdir/design_params_prebuilt/
+containing your target sequences in the targets.csv file. See example in example_outdir/design_params_prebuilt/. You can leave the target_homology field blank for the organism(s)
+that you are using for building the target consensus, but you must provide it for any additional organisms that you are screening candidate probes against if they are not
+included in building the target consensus.
 
 Run the pipeline using a pre-built transcript index:
 
