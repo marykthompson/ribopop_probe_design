@@ -74,3 +74,9 @@ included in building the target consensus.
 Run the pipeline using a pre-built transcript index:
 
     snakemake -s use_prebuilt_indices.smk --directory <your output directory>
+
+### Other notes ###
+
+The pipeline assumes that fasta files used for building the transcript index end in
+a newline character (\n) as the Ensembl ones used here do. If yours do not, you should
+add one before running the pipeline.
