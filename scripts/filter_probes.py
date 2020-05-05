@@ -93,7 +93,7 @@ def main(arglist):
     bad_kmers = set.union(*alnmts)
     df = pd.read_csv(probe_csv, index_col = 'unique_id')
     df['passed_homology_screen'] = ~df.index.isin(bad_kmers)
-    df[df['passed_homology_screen']].to_csv(filtered_probe_csv, index = False)
+    df[df['passed_homology_screen']].to_csv(filtered_probe_csv)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
