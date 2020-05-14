@@ -75,6 +75,35 @@ Run the pipeline using a pre-built transcript index:
 
     snakemake -s use_prebuilt_indices.smk --directory <your output directory>
 
+If you are unhappy with the probes the pipeline chooses or you want to choose probes other
+than those at Tm peaks, you can choose probes directly from the potential_probes_filt.csv file
+that is in the output directory named for the target (e.g. 18S/potential_probes_filt.csv).
+These probes have all passed screening with the user-selected sequence and specificity checking criteria.
+
+One additional analysis that the pipeline does is to check for potential heterodimers between
+all selected probes and discard probes that have an unacceptably low delta G for
+heterodimer formation. If you select probes directly from the potential_probes_filt.csv
+file, then you may want to check this yourself. A simple way to check heterodimer
+formation would be to use the calc_dimer() function from choose_probes.py, e.g.:
+
+    import pandas as pd
+    import choose_probes
+    df = pd.read_csv('my_candidate_probes.csv', index_col = 'unique_id')
+    df[['dimer_dG','dimer_partner']] = choose_probes.calc_dimer(df)
+    df.to_csv('my_candidate_probes_wdimers.csv')
+
+If you simply want to add one additional probe to an existing probe set (for example,
+if you ran the pipeline a second time with more relaxed constraints to find probes
+in a difficult-to-target region), you can use the add_extra_probe.py script.
+
+    python add_extra_probe.py my_probes.csv candidate_extra_probes.csv expanded_probeset -10
+
+This would create a new file named expanded_probeset.csv with one additional probe from
+candidate_extra_probes.csv that had > -10 delta G predicted heterodimer with any of
+the other probes. Both input csv files should have the 'unique_id' field. For example,
+my_probes.csv could be the output probe set from a pipeline run and candidate_extra_probes.csv
+could be a selection of probes from the protential_probes_filt.csv file.
+
 ### Other notes ###
 
 The pipeline assumes that fasta files used for building the transcript index end in
