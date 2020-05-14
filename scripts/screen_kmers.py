@@ -202,11 +202,7 @@ def main(arglist):
     parser.add_argument('-sequence_filter_rules', nargs = '+', default = default_rules, help = 'remove probes not passing these, choose from: %s' % ', '.join(possible_rules))
     #These will not be in a list
     parser.add_argument('-Na_conc', default = 300, help = 'Na+ concentration of hybridization in mM')
-    parser.add_argument('-premade_probes', help = 'csv file containing sequences of probes already designed elsewhere')
-    parser.add_argument('--analyze_oligos', action = 'store_true', help = 'input a csv file containing sequences to calculate Tm and dG values, dont run the rest')
-    parser.add_argument('--design_probes', action = 'store_true', help = 'run probe design')
-    parser.add_argument('--quick_test', action = 'store_true', help = 'run with only a subset of probes to check output')
-
+    
     args, unknown = parser.parse_known_args()
     if 'snakemake' in globals():
         args = probe_helpers.set_snake_args(args, snakemake)
@@ -261,6 +257,7 @@ def main(arglist):
     with open(args.probe_fa, 'w') as f:
         for i in df.itertuples():
             f.write('>%s\n%s\n' % (i.Index, i.target_sequence))
+
 
 if __name__ == '__main__':
     main(sys.argv[1:])
