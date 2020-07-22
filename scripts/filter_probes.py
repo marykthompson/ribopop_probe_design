@@ -30,17 +30,18 @@ def create_alnmt(start, end, chrom, name):
     Given 1-based blast start, end and chromosome, return an HTSeq Alignment object
     '''
     iv = create_genomic_interval(start, end, chrom)
-    #note that name is string of 0-based start of alignment
     r = HTSeq.SequenceWithQualities(b"", str(name), b"")
     alnmt = HTSeq.Alignment(r, iv)
     return alnmt
 
-def overlapper(blast_df, regions, discard_minus_strand = False, mode = 'keep'):
+def overlapper(blast_df, regions, discard_minus_strand = True, mode = 'discard'):
     '''
     Given alignments and genomic array, return aligments that do or do not overlap the array
-    mode = keep -> return alignments that overlap the array (use for genes)
     mode = discard -> discard alignments that overlap the array (use for rRNA)
-    The set of alignments will be used to create the masked target sequence.
+    If discard_minus_strand = True, then minus strand alignments will be assumed
+    unuseful and not returned.
+    e.g. if given rRNA regions, discard_minus_strand and mode = 'discard', will
+    only return plus strand alignments that don't overlap the rRNA.
     '''
     indices = []
     for row in blast_df.itertuples():
@@ -85,7 +86,9 @@ def main(arglist):
         regions = [create_genomic_interval(x, y, z) for x, y, z in zip(target_blast_df['sstart'], target_blast_df['send'], target_blast_df['sseqid'])]
         rRNA_genes = HTSeq.GenomicArrayOfSets("auto", stranded = True)
         for r in regions:
-            rRNA_genes[r] += 'rRNA'
+            #only count if on the same strand as the rRNA:
+            if r.strand == '+':
+                rRNA_genes[r] += 'rRNA'
 
         filt_df = overlapper(kmer_blast_df, rRNA_genes, discard_minus_strand = True, mode = 'discard')
         alnmts.append(set(filt_df['qseqid'].tolist()))

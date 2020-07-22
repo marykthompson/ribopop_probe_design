@@ -22,9 +22,9 @@ def blast_kmers(subject_fasta, query_fasta, outfile, min_bitscore = 30, evalue =
     '''
     Blast the kmers to genome or cDNA collection with blastn.
     '''
-    cmd = ' '.join(['blastn', '-task', 'blastn-short', '-dust', 'no', '-soft_masking',
-    'false', '-db', subject_fasta, '-query', query_fasta, '-outfmt', '10', '-evalue', str(evalue), '-out', outfile])
-    subprocess.check_call(cmd, shell = True)
+    cmd = ['blastn', '-task', 'blastn-short', '-dust', 'no', '-soft_masking',
+    'false', '-db', subject_fasta, '-query', query_fasta, '-outfmt', '10', '-evalue', str(evalue), '-out', outfile]
+    subprocess.run(cmd, shell = False)
     df = pd.read_csv(outfile, names = ['qseqid', 'sseqid', 'pident', 'length',
     'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore'])
     aln_df = df[df['bitscore'] >= min_bitscore].copy()
@@ -32,8 +32,8 @@ def blast_kmers(subject_fasta, query_fasta, outfile, min_bitscore = 30, evalue =
     aln_df.to_csv(outfile, index = False)
 
 def blast_txts(subject_fasta, query_fasta, outfile):
-    cmd = ' '.join(['blastn', '-db', subject_fasta, '-query', query_fasta, '-outfmt', '10', '-out', outfile])
-    subprocess.check_call(cmd, shell = True)
+    cmd = ['blastn', '-db', subject_fasta, '-query', query_fasta, '-outfmt', '10', '-out', outfile]
+    subprocess.run(cmd, shell = False)
     #add header
     df = pd.read_csv(outfile, names = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore'])
     df.to_csv(outfile, index = False)

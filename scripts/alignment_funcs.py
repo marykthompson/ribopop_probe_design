@@ -55,7 +55,10 @@ def write_alignment(fasta, name, outname):
         return alignment
 
     else:
-        subprocess.run('mafft --auto --clustalout %s > %s.clustal' % (fasta, outname), shell = True)
+        mafftout = '%s.clustal' % outname
+        with open(mafftout, 'w') as g:
+            cmd = ['mafft', '--auto', '--clustalout', fasta]
+            subprocess.run(cmd, stdout = g, shell = False)
         alignment = AlignIO.read('%s.clustal' % outname, 'clustal')
         info = AlignInfo.SummaryInfo(alignment)
         #Get the sequence with alignment gaps or mismatches turned into Ns, but with the ends filled in with any sequence that covers it
