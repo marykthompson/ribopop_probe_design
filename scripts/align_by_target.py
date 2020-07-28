@@ -24,7 +24,7 @@ def main(arglist):
     name = snakemake.params['name']
 
     #combine fastas to single file
-    temp_fasta = 'temp_multi.fa'
+    temp_fasta = 'temp_multi_%s.fa' % name
     record_list = []
     with open(temp_fasta, "w") as g:
         for i in fastas:
