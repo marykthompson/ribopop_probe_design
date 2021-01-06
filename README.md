@@ -26,7 +26,9 @@ Prepare an output directory. Prepare a config.yml file matching the format of ex
 
 2. targets.csv: This file contains the names of the rRNA targets, their corresponding organisms,
 and the name of fasta file containing their sequences. Note that it is fine to provide all targets
-in the same fasta file or to provide them in separate fasta files. If the fasta files contain sequences not matching the provided IDs, only those matching the provided IDs will be included. If left blank, the fasta file with default to the ncrna.fa file provided for that organism. Special regions in the target transcripts can also be indicated in this file (1-based, closed interval). The transcript-specific indices will be converted to consensus sequence indices during the alignment steps.
+in the same fasta file or to provide them in separate fasta files. If the fasta files contain sequences not matching the provided IDs, only those matching the provided IDs will be included. If left blank, the fasta file will default to the ncrna.fa file provided for that organism. Note
+that the Clustal program used for alignment truncates sequence IDs at 15 characters, so the IDs
+should be 15 characters or fewer to avoid downstream errors. Special regions in the target transcripts can also be indicated in this file (1-based, closed interval). The transcript-specific indices will be converted to consensus sequence indices during the alignment steps.
     excluded_regions: Regions that should not overlap with probes.
     target_subregions: Split the target up into multiple regions for probe design. This feature was used to specify that an equal number of probes should be targeted to the left and right side
   of the Drosophila 28S, which is cleaved into two fragments.

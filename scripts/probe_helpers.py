@@ -28,7 +28,7 @@ def get_subregion_ranges(ranges_string):
     subregion_list = [i for i in ranges_string.replace(', ',',').split(',')]
     for i in subregion_list:
         start, end = [int(j.strip()) for j in i.split('-')]
-        #convert to 0-based, half-open
+        #convert to 0-based, closed
         start -= 1
         end -= 1
         subregion_ranges.append([start, end])

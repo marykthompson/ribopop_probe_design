@@ -22,12 +22,13 @@ def my_func_dist(array, ideal_length):
 
 def choose_combination(target_position, no_probe_sites):
     # all possible combinations for probe site insertions
+    #ensure that target position is sorted
+    target_position = sorted(target_position)
     all_combinations = list(itertools.combinations(target_position, no_probe_sites))
 
     # use this to specify sites of probe insertions
     # e.g. if you want a probe site at the first available candidate and the last available candidate
     selected_combinations =[]
-    #last_element = len(target_position) - 1
     for x in all_combinations:
         if x[0] == target_position[0] and x[-1] == target_position[-1]: #I specify the first and the last probe sites
             selected_combinations.append(x)

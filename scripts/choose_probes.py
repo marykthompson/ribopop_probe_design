@@ -15,6 +15,7 @@ import logging
 from scipy import signal
 import probe_site_selection
 import probe_helpers
+import scipy.stats
 
 class NotEnoughSpaceException(Exception):
     '''
@@ -51,7 +52,7 @@ def calc_dimer(df):
         for j in range(0, len(a)):
             #This includes both homodimers and heterodimers.
             l.append((primer3.calcHeterodimer(a[i][1], a[j][1], mv_conc = 300).dg/1000, a[j][0]))
-        maxinteraction = min(l)
+        maxinteraction = sorted(l, key = lambda x: x[0])[0]
         max_ints.append(maxinteraction)
     dimer_dG = pd.DataFrame(max_ints, index = df.index)
     return dimer_dG
@@ -95,7 +96,67 @@ def remove_bad_probes(df, dimer_min_dG, all_selected_probes, filter = True):
         df.sort_values('dimer_dG', inplace = True)
     return df
 
-def prune(df, desired_number_probes, target_len, subregions = None):
+def thin_bad_peaks(df, bad_peak_positions, window_size = 11):
+    '''
+    Given the location for the bad peaks, return df with the potential probes
+    within given window size removed. This will hopefully allow new peaks without
+    dimer clashes to be found.
+    window_size: should be an odd number, e.g. if 11, then potential probes from
+    5 nt 5' and 3 nt 3' will be removed around the bad peak.
+    '''
+    halfwin = int(math.floor((window_size - 1)/2))
+    starts_to_remove = []
+    for i in bad_peak_positions:
+        starts_to_remove.extend([*range(i - halfwin, i + halfwin + 1)])
+
+    #set Tm of starts_to_remove to 0 so that they will not be found as peaks
+    df.loc[df['start'].isin(starts_to_remove), 'Tm'] = 0
+    return df
+
+def find_peaks_and_screen(df, this_distance, min_dimer_dG, all_selected_probes):
+    '''
+    Find Tm peaks within the set of probes.
+    Remove probes that have heterodimer clashes with other probes in the set.
+    '''
+    data = df['Tm'].values
+    maxes, properties = signal.find_peaks(data, distance = this_distance)
+    df['Tm_peak'] = df.index.isin(maxes)
+    #screen the peaks to remove ones that cause dimers with the others:
+    screened_df = remove_bad_probes(df[df['Tm_peak']], min_dimer_dG, all_selected_probes)
+    return df, screened_df
+
+def peaks_testval(peak_locs, range, nprobes, half_probelen):
+    '''
+    This is a measure of peak distribution evenness.
+    One metric is the number of nonzero bins in a range.
+    Another metric, currently in use, is the largest gap between peak starts.
+    '''
+    mid_locs = peak_locs + half_probelen
+
+    #This metric returns the number of nonzero bins in range
+    #nonzero = np.count_nonzero(np.histogram(mid_locs, range = range, bins = nprobes)[0])
+    #return nonzero
+
+    #special cases for 1 and 2 probes desired:
+    if nprobes == 1:
+        #we want to minize the distance of a probe to the midpt
+        mid = math.ceil(range[1] - range[0]/2)
+        dist = [abs(i - mid) for i in mid_locs]
+        return min(dist)
+
+    elif nprobes == 2:
+        #we want to minimize the distance to the ends of the target
+        end_dist_sum = sum([mid_locs[0] - range[0], range[1] - mid_locs[-1]])
+        return end_dist_sum
+
+    else:
+        #This metric returns the largest gap between probe mid pts
+        dist = [t - s for s, t in zip(mid_locs, mid_locs[1:])]
+        end_dist = [mid_locs[0] - range[0], range[1] - mid_locs[-1]]
+        dist.extend(end_dist)
+        return max(dist)
+
+def prune(df, desired_number_probes, target_len, min_dimer_dG, all_selected_probes, subregions = None):
     '''
     Prune the probes into the desired number of probes per target.
     - find Tm peaks
@@ -112,10 +173,10 @@ def prune(df, desired_number_probes, target_len, subregions = None):
     tm_df['unique_id'] = tm_df.index
 
     if not probe_helpers.range_defined(subregions):
-        #make 0-based, half-open to match format of get_subregion_ranges()
+        #make 0-based, closed to match format of get_subregion_ranges()
         subregions = np.array([[0, target_len - 1]])
 
-    #split the desired number of probes betwen the subregions
+    #split the desired number of probes between the subregions
     this_probeset_size =  int(math.ceil(desired_number_probes/len(subregions)))
     chosen_probes = []
     sorted_subregions = subregions[np.argsort(subregions[:, 0])]
@@ -127,24 +188,51 @@ def prune(df, desired_number_probes, target_len, subregions = None):
 
     for i, subregion in enumerate(subregions):
         #get the mini df that contains the data in the subregion
-        sub_df = tm_df[(subregion[0] <= tm_df['target_start']) & (tm_df['target_end'] <= subregion[1])]
+        sub_df = tm_df[(subregion[0] <= tm_df['start']) & (tm_df['end'] <= subregion[1] + 1)]
 
         #Add the missing start positons back to but with Tm of 0
         #This way, they will be included in the distance consideration for peak finding
         #but can't be chosen as peaks themselves
-        this_distance = 100
-
-        #start earlier because it cannot choose the endpts
+        #add a point before and after endpts so endpts can be chosen as peaks
         start_range = range(sub_df['start'].min() - 1, sub_df['start'].max()+ 2)
+        if this_probeset_size < 3:
+            this_distance = 20
+        else:
+            this_distance = math.ceil((start_range[-1] - start_range[0] - 2)/(this_probeset_size*3))
         range_df = pd.DataFrame(start_range, columns = ['start'])
-        new_df = pd.merge(range_df[['start']], sub_df[['unique_id', 'Tm', 'start']], 'outer', on = 'start')
+        new_df = pd.merge(range_df[['start']], sub_df[['unique_id', 'Tm', 'start', 'length', 'sequence']], 'outer', on = 'start')
         new_df['Tm'].fillna(0, inplace = True)
+        half_probelen = int(round(new_df['length'].mean()/2, 0))
 
-        #find Tm peaks
-        data = new_df['Tm'].values
-        maxes, properties = signal.find_peaks(data, distance = this_distance)
-        new_df['Tm_peak'] = new_df.index.isin(maxes)
-        peak_locs = new_df.loc[new_df['Tm_peak'], 'start'].values
+        #Find peaks and screen for dimers. Drop peaks which cause dimers and repeat.
+        #Choose the set of peaks with best testval (i.e. min distance between neighboring peaks).
+        new_df, screened_df = find_peaks_and_screen(new_df, this_distance, min_dimer_dG, all_selected_probes)
+
+        #1) Get original and screened peaks
+        prescreened = new_df[new_df['Tm_peak']]['start'].values
+        screened = screened_df['start'].values
+        screened = np.sort(screened)
+        screened_attempts = [screened]
+        p = 1
+        num_tests = 5
+        while p < num_tests:
+            #find peaks that were screened out in the dimer removal step:
+            bad_peaks = set(prescreened).difference(set(screened))
+            #remove probes from around the bad peaks and find new peaks:
+            new_df = thin_bad_peaks(new_df, bad_peaks)
+            new_df, screened_df = find_peaks_and_screen(new_df, this_distance, min_dimer_dG, all_selected_probes)
+            prescreened = new_df[new_df['Tm_peak']]['start'].values
+            screened = screened_df['start'].values
+            screened = np.sort(screened)
+            screened_attempts.append(screened)
+            p += 1
+
+        allvals = [peaks_testval(i, (subregion[0], subregion[1]), this_probeset_size, half_probelen) for i in screened_attempts]
+        #get index max if the value is good, like nonzero bins
+        #best_attempt = allvals.index(max(allvals))
+        #get index min if the value is bad, like for largest distance between points
+        best_attempt = allvals.index(min(allvals))
+        peak_locs = screened_attempts[best_attempt]
         logging.info('%s Tm peaks found.' % len(peak_locs))
         #get optimal spacing for desired number of probes
         if len(peak_locs) < this_probeset_size:
@@ -155,20 +243,25 @@ def prune(df, desired_number_probes, target_len, subregions = None):
         #if only want 1 probe, choose one closest to the middle
         if len(peak_locs) == 1 and this_probeset_size == 1:
             chosen_locs = peak_locs
-        elif len(peak_locs) > 1 and this_probeset_size == 1:
-            mid_dist = abs((peak_locs - subregion[0])/(subregion[-1] - subregion[0] + 1) - 0.5)
+        elif this_probeset_size == 1:
+            mid_dist = abs((peak_locs + half_probelen - subregion[0])/(subregion[-1] - subregion[0] + 1) - 0.5)
             chosen_locs = [peak_locs[np.argmin(mid_dist)]]
+        elif this_probeset_size == 2:
+            #for two probes, choose ones closest to the ends
+            chosen_locs = [peak_locs[0], peak_locs[-1]]
         else:
             chosen_locs = probe_site_selection.choose_combination(peak_locs, this_probeset_size)
         chosen_ids = new_df.loc[new_df['start'].isin(chosen_locs), 'unique_id'].values
-        chosen_probes.append(df[df.index.isin(chosen_ids)].copy())
+        chosen_df = df[df.index.isin(chosen_ids)].copy()
+        #After the final choice, append to chosen probes and all_selected_probes
+        chosen_probes.append(chosen_df)
+        all_selected_probes = all_selected_probes.append(chosen_df)
 
     #combine probes from each subregion into the pruned_df
     pruned_df = pd.concat(chosen_probes)
     return pruned_df
 
 def summarize_results(df, final_df, target_len, outfile):
-
     '''
     Write the final selected probes, plot the selected regions.
     '''
@@ -246,29 +339,15 @@ def main(arglist):
 
         logging.info("Starting with %s potential probes." % len(df))
 
-        #Prune the remaining probes to the desired number of probes.
-        removed_idx = [1]
-        p = 0
-        while len(removed_idx) > 0:
-            #get evenly spaced probes from the passed ones
-            pruned_df = prune(df, desired_number_probes[i], target_lens[i], subregions = target_subregions)
-            #drop rows causing the low dimer dG scores
-            logging.info('removing probes with dimer clashes')
-            screened_df = remove_bad_probes(pruned_df, min_dimer_dG[i], all_selected_probes)
-            #get indices of the pruned probes that don't survive heterodimer screening
-            removed_idx = pruned_df.index.difference(screened_df.index)
-            #drop bad heterodimer probes, will trigger rerun of prune with this probe removed.
-            df.drop(removed_idx, inplace = True)
-            p += 1
-
-        #Get the properties of the selected probes and write to output file
-        final_df = pd.merge(df.reindex(pruned_df.index),
-        screened_df[['dimer_dG','dimer_partner']], left_index = True, right_index = True)
-        logging.info("%s probes selected." % len(final_df))
-        all_selected_probes = all_selected_probes.append(final_df)
-        summarize_results(df, final_df, target_lens[i], selected_probes_plots[i])
+        #Get evenly spaced probes from the passed ones, also screening for heterodimers
+        pruned_df = prune(df, desired_number_probes[i], target_lens[i], min_dimer_dG[i], all_selected_probes, subregions = target_subregions)
+        logging.info("%s probes selected." % len(pruned_df))
+        all_selected_probes = all_selected_probes.append(pruned_df)
+        summarize_results(df, pruned_df, target_lens[i], selected_probes_plots[i])
 
     #write the combined output file with probes selected for all targets.
+    #add the dimer dG and dimer partner for all probes:
+    all_selected_probes[['dimer_dG', 'dimer_partner']] = calc_dimer(all_selected_probes)
     all_selected_probes.sort_values(by = ['target_name', 'target_start'], inplace = True)
     all_selected_probes.reset_index(inplace = True)
     all_selected_probes['probe_num'] = all_selected_probes.index

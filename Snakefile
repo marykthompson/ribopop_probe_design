@@ -9,15 +9,7 @@ ann_df = pd.read_csv(os.path.join(config['parameter_dir'], config['seqs_and_anno
 target_df = pd.read_csv(os.path.join(config['parameter_dir'], config['targets']))
 targets = target_df['target'].unique()
 orgs = target_df['organism'].unique()
-targets.sort()
-orgs.sort()
 param_df = pd.read_csv(os.path.join(config['parameter_dir'], config['params'])).set_index('target', drop = False)
-
-def get_targets(wildcards):
-    '''
-    Get the target IDs from the target.csv file.
-    '''
-    return target_df.loc[((target_df['target'] == wildcards.target) & (target_df['organism'] == wildcards.org)), 'ID'].values
 
 rule all:
     input:
