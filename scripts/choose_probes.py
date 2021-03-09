@@ -314,7 +314,8 @@ def main(arglist):
     all_selected_probes_file = snakemake.output['all_selected_probes']
 
     num_targets = len(target_fastas)
-    target_names = [os.path.basename(i).rstrip('.fa') for i in target_fastas]
+
+    target_names = [os.path.basename(i).split('.fa')[0] for i in target_fastas]
     target_lens = [len(next(SeqIO.parse(i, 'fasta'))) for i in target_fastas]
 
     all_selected_probes = pd.DataFrame()

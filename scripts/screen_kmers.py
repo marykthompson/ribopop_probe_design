@@ -202,12 +202,12 @@ def main(arglist):
     parser.add_argument('-sequence_filter_rules', nargs = '+', default = default_rules, help = 'remove probes not passing these, choose from: %s' % ', '.join(possible_rules))
     #These will not be in a list
     parser.add_argument('-Na_conc', default = 300, help = 'Na+ concentration of hybridization in mM')
-    
+
     args, unknown = parser.parse_known_args()
     if 'snakemake' in globals():
         args = probe_helpers.set_snake_args(args, snakemake)
 
-    target_name = os.path.basename(args.target_fasta).rstrip('.fa')
+    target_name = os.path.basename(args.target_fasta).split('.fa')[0]
 
     logging.basicConfig(level=logging.DEBUG, filename = args.logfile, filemode = 'w', format = '%(message)s')
     logging.info('Target %s: ' % target_name)
