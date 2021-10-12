@@ -18,11 +18,28 @@ import probe_helpers
 import scipy.stats
 
 class NotEnoughSpaceException(Exception):
-    '''
-    Not enough space on target sequence to design requested number of probes.
-    Consider designing fewer probes or relaxing your design constraints.
-    '''
-    pass
+
+    msg = '''Not enough space on target sequence to design requested number of
+          probes. Consider designing fewer probes or relaxing your design
+          constraints.'''
+
+    def __init__(self, message=msg):
+        self.message = message
+
+    def __str__(self):
+        return f'{self.message}'
+
+class AllPotentialProbesRemovedException(Exception):
+
+    msg = '''All potential probes have been removed, for example by setting
+          target subregions as too narrow a range. Consider widening the target
+          subregion range.'''
+
+    def __init__(self, message=msg):
+        self.message = message
+
+    def __str__(self):
+        return f'{self.message}'
 
 def dist_from_neighbors(s):
     '''
@@ -163,10 +180,6 @@ def prune(df, desired_number_probes, target_len, min_dimer_dG, all_selected_prob
     - get N evenly spaced probes
     '''
 
-    error_message = '''\
-    Not enough space to design requested number of probes.
-    Consider designing fewer probes or relaxing your design constraints.'''
-
     #choose the highest Tm probe at each start site:
     idx = df.groupby(['start'])['Tm'].transform(max) == df['Tm']
     tm_df = df[idx].copy()
@@ -180,7 +193,6 @@ def prune(df, desired_number_probes, target_len, min_dimer_dG, all_selected_prob
     this_probeset_size =  int(math.ceil(desired_number_probes/len(subregions)))
     chosen_probes = []
     sorted_subregions = subregions[np.argsort(subregions[:, 0])]
-
     #add 1 to the endpts to make half-open
     sorted_subregions[:,1] += 1
     substring = ', '.join(['%s-%s' % (i[0] + 1, i[1]) for i in sorted_subregions])
@@ -189,6 +201,10 @@ def prune(df, desired_number_probes, target_len, min_dimer_dG, all_selected_prob
     for i, subregion in enumerate(subregions):
         #get the mini df that contains the data in the subregion
         sub_df = tm_df[(subregion[0] <= tm_df['start']) & (tm_df['end'] <= subregion[1] + 1)]
+        if sub_df.empty:
+            error = AllPotentialProbesRemovedException()
+            logging.info(error.message)
+            raise error
 
         #Add the missing start positons back to but with Tm of 0
         #This way, they will be included in the distance consideration for peak finding
@@ -199,6 +215,8 @@ def prune(df, desired_number_probes, target_len, min_dimer_dG, all_selected_prob
             this_distance = 20
         else:
             this_distance = math.ceil((start_range[-1] - start_range[0] - 2)/(this_probeset_size*3))
+            if this_distance < 20:
+                this_distance = 20
         range_df = pd.DataFrame(start_range, columns = ['start'])
         new_df = pd.merge(range_df[['start']], sub_df[['unique_id', 'Tm', 'start', 'length', 'sequence']], 'outer', on = 'start')
         new_df['Tm'].fillna(0, inplace = True)
@@ -236,8 +254,9 @@ def prune(df, desired_number_probes, target_len, min_dimer_dG, all_selected_prob
         logging.info('%s Tm peaks found.' % len(peak_locs))
         #get optimal spacing for desired number of probes
         if len(peak_locs) < this_probeset_size:
-            logging.info(error_message)
-            raise NotEnoughSpaceException(error_message)
+            error = NotEnoughSpaceException()
+            logging.info(error.message)
+            raise error
 
         #remove edgecases
         #if only want 1 probe, choose one closest to the middle
