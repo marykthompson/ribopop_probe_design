@@ -6,6 +6,8 @@ scripts/.snakemake*
 !example_outdir/*
 !example_outdir/*/*
 !Snakefile
+!predesigned_probesets/
+!predesigned_probesets/*
 !use_prebuilt_indices.smk
 !check_probe_homology.smk
 !config.yaml

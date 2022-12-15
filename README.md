@@ -111,3 +111,7 @@ could be a selection of probes from the protential_probes_filt.csv file.
 The pipeline assumes that fasta files used for building the transcript index end in
 a newline character (\n) as the Ensembl ones used here do. If yours do not, you should
 add one before running the pipeline.
+
+### Predesigned probesets ###
+
+This folder contains predesigned probesets from the paper (Table S2) with additional probe sequences added when they become available.
